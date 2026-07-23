@@ -1,0 +1,1 @@
+"""Parliament Analytics MCP Server."""
