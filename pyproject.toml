@@ -1,0 +1,55 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "parliament-analytics-mcp"
+version = "0.1.0"
+description = "MCP server for German Bundestag DIP API — faction distribution analytics"
+requires-python = ">=3.11"
+dependencies = [
+    "fastmcp>=2.0.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.7.0",
+    "pydantic-settings>=2.3.0",
+    "tenacity>=8.3.0",
+    "python-dotenv>=1.0.0",
+    "python-json-logger>=2.0.7",
+    "groq>=0.9.0",
+    "anthropic>=0.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2.0",
+    "pytest-asyncio>=0.23.0",
+    "pytest-httpx>=0.30.0",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.4.0",
+    "black>=24.4.0",
+]
+
+[project.scripts]
+parliament-cli  = "mcp_server.cli:main"
+parliament-chat = "mcp_server.chat:main"
+parliament-mcp  = "mcp_server.server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mcp_server*"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+addopts = "--cov=mcp_server --cov-report=term-missing"
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+
+[tool.black]
+line-length = 88
+target-version = ["py311"]
