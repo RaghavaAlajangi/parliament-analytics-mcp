@@ -61,6 +61,18 @@ class TestRoute:
         assert result.tool == "get_politician"
 
     @pytest.mark.asyncio
+    async def test_retry_prompt_includes_previous_error(self) -> None:
+        valid = _valid_response("get_politician", {"name": "Merz"})
+        mock = AsyncMock(
+            side_effect=[("not json", "llama3"), (valid, "llama3")]
+        )
+        with patch("mcp_server.llm.router.complete", new=mock):
+            await route("Wer ist Merz?", settings=_mock_settings())
+        retry_prompt = mock.call_args_list[1].kwargs["prompt"]
+        assert "Previous attempt failed with:" in retry_prompt
+        assert retry_prompt.rstrip().endswith("Please correct and try again.")
+
+    @pytest.mark.asyncio
     async def test_raises_routing_error_after_all_retries(self) -> None:
         with patch(
             "mcp_server.llm.router.complete",
