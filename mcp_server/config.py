@@ -12,7 +12,10 @@ class Settings(BaseSettings):
     dip_page_size: int = 100
     dip_max_concurrent: int = 3
     dip_page_delay: float = 0.0  # seconds between paginated requests
-    dip_max_records: int = 300  # hard cap across all pages
+    # Runaway guard only — must exceed the size of one Wahlperiode
+    # (~1000-2000 person records) or distributions are computed on a
+    # biased sample
+    dip_max_records: int = 5000
     dip_retry_attempts: int = 4
     dip_retry_min_wait: float = 1.0  # seconds, exponential backoff floor
     dip_retry_max_wait: float = 30.0  # seconds, backoff/Retry-After ceiling

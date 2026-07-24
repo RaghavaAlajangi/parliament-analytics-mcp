@@ -33,13 +33,26 @@ async def get_fraktion_distribution(wahlperiode: int) -> FraktionDistribution:
         async for person in client.get_persons(wahlperiode=wahlperiode):
             persons.append(person)
 
+    # The f.wahlperiode filter is sent to the API, but its effect on the
+    # /person list is not guaranteed — filter client-side as well so the
+    # distribution never counts records from other legislative periods.
+    in_period = [
+        p for p in persons if wahlperiode in p.wahlperiode_nummer
+    ]
+    excluded = len(persons) - len(in_period)
+
     logger.info(
         f"get_fraktion_distribution wahlperiode={wahlperiode} "
-        f"total_persons={len(persons)}"
+        f"fetched={len(persons)} in_period={len(in_period)}"
     )
 
-    result = compute_distribution(persons, wahlperiode)
+    result = compute_distribution(in_period, wahlperiode)
 
+    if excluded:
+        result.data_quality_notes.append(
+            f"{excluded} fetched records were not associated with "
+            f"Wahlperiode {wahlperiode} and were excluded."
+        )
     if len(persons) >= settings.dip_max_records:
         result.data_quality_notes.append(
             f"Result is based on a sample of {len(persons)} records "
