@@ -136,3 +136,59 @@ class TestDIPClientResilience:
         with pytest.raises(DIPUnavailableError):
             async with DIPClient(settings) as client:
                 [p async for p in client.get_persons(wahlperiode=20)]
+
+
+class TestDIPClientCache:
+    @pytest.mark.asyncio
+    async def test_second_call_served_from_cache(
+        self, httpx_mock, tmp_path
+    ) -> None:
+        settings = Settings(
+            dip_api_key="BTK2024",
+            groq_api_key="test",
+            dip_cache_ttl=60.0,
+            dip_cache_dir=str(tmp_path),
+        )
+        # Only ONE HTTP response is queued; the second identical query
+        # must be answered from the cache or the mock would fail.
+        httpx_mock.add_response(
+            json={
+                "cursor": None,
+                "numFound": 1,
+                "documents": [_person_doc("p1")],
+            }
+        )
+
+        async with DIPClient(settings) as client:
+            first = [p async for p in client.get_persons(wahlperiode=20)]
+        async with DIPClient(settings) as client:
+            second = [p async for p in client.get_persons(wahlperiode=20)]
+
+        assert [p.id for p in first] == [p.id for p in second] == ["p1"]
+
+    @pytest.mark.asyncio
+    async def test_expired_entry_refetches(
+        self, httpx_mock, tmp_path
+    ) -> None:
+        settings = Settings(
+            dip_api_key="BTK2024",
+            groq_api_key="test",
+            dip_cache_ttl=0.000001,
+            dip_cache_dir=str(tmp_path),
+        )
+        for _ in range(2):
+            httpx_mock.add_response(
+                json={
+                    "cursor": None,
+                    "numFound": 1,
+                    "documents": [_person_doc("p1")],
+                }
+            )
+
+        async with DIPClient(settings) as client:
+            [p async for p in client.get_persons(wahlperiode=20)]
+        async with DIPClient(settings) as client:
+            [p async for p in client.get_persons(wahlperiode=20)]
+
+        # both queued responses were consumed — no stale cache reuse
+        assert len(httpx_mock.get_requests()) == 2

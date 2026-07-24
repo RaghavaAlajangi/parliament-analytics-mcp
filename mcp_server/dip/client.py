@@ -4,6 +4,7 @@ limiting."""
 import asyncio
 import logging
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -15,6 +16,7 @@ from tenacity import (
 )
 
 from mcp_server.config import Settings
+from mcp_server.dip.cache import ResponseCache
 from mcp_server.dip.models import (
     DIPListResponse,
     Person,
@@ -83,6 +85,11 @@ class DIPClient:
         self._max_records = settings.dip_max_records
         self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
         self._client: httpx.AsyncClient | None = None
+        self._cache: ResponseCache | None = (
+            ResponseCache(Path(settings.dip_cache_dir), settings.dip_cache_ttl)
+            if settings.dip_cache_ttl > 0
+            else None
+        )
         # Retry settings come from config, so tests and deployments can
         # tune backoff without touching code
         self._get = retry(
@@ -151,6 +158,20 @@ class DIPClient:
         response.raise_for_status()
         return response.json()
 
+    async def _get_cached(
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> dict:
+        """Serve from the TTL cache when enabled, else fetch and store."""
+        if self._cache is not None:
+            cached = self._cache.get(path, params)
+            if cached is not None:
+                logger.debug("DIP cache hit: GET %s", path)
+                return cached
+        data = await self._get(path, params)
+        if self._cache is not None:
+            self._cache.put(path, params, data)
+        return data
+
     async def get_persons(
         self,
         wahlperiode: int | None = None,
@@ -183,7 +204,7 @@ class DIPClient:
             if cursor:
                 params["cursor"] = cursor
 
-            raw = await self._get("/person", params)
+            raw = await self._get_cached("/person", params)
             resp = DIPListResponse.model_validate(raw)
 
             for doc in resp.documents:
@@ -227,5 +248,7 @@ class DIPClient:
         PersonDetail
             Full politician record including roles.
         """
-        raw = await self._get(f"/person/{person_id}", {"format": "json"})
+        raw = await self._get_cached(
+            f"/person/{person_id}", {"format": "json"}
+        )
         return PersonDetail.model_validate(raw)

@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     dip_retry_attempts: int = 4
     dip_retry_min_wait: float = 1.0  # seconds, exponential backoff floor
     dip_retry_max_wait: float = 30.0  # seconds, backoff/Retry-After ceiling
+    dip_cache_ttl: float = 0.0  # seconds; 0 disables response caching
+    dip_cache_dir: str = ".dip_cache"
     tool_timeout: float = 60.0  # seconds before a tool call is aborted
 
     # LLM
