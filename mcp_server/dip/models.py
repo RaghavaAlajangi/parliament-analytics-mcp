@@ -51,8 +51,16 @@ class Person(BaseModel):
 
     @property
     def full_name(self) -> str:
-        parts = [self.titel, self.vorname, self.namenszusatz, self.nachname]
-        return " ".join(p for p in parts if p)
+        """Plain name, e.g. 'Ursula von der Leyen'.
+
+        `titel` is NOT included: the API returns it as the full display
+        string ('Dr. Ursula von der Leyen, Bundesmin., ...'), which would
+        duplicate the name. It is used only as a fallback when the name
+        parts are missing.
+        """
+        parts = [self.vorname, self.namenszusatz, self.nachname]
+        name = " ".join(p for p in parts if p)
+        return name or (self.titel or "")
 
 
 class PersonDetail(Person):
