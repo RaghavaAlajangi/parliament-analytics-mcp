@@ -66,8 +66,20 @@ class DIPClient:
         wahlperiode: int | None = None,
         search: str | None = None,
     ) -> AsyncIterator[Person]:
-        """Paginate all persons, optionally filtered by wahlperiode or search
-        term."""
+        """Paginate all persons, optionally filtered by wahlperiode or search.
+
+        Parameters
+        ----------
+        wahlperiode : int or None, optional
+            Filter results to this Wahlperiode number.
+        search : str or None, optional
+            Free-text search term matched against person names.
+
+        Yields
+        ------
+        Person
+            Validated Person records from the DIP API.
+        """
         params: dict[str, Any] = {"format": "json", "rows": self._page_size}
         if wahlperiode is not None:
             params["f.wahlperiode"] = wahlperiode
@@ -96,6 +108,17 @@ class DIPClient:
                 break
 
     async def get_person(self, person_id: str) -> PersonDetail:
-        """Fetch a single politician by ID."""
+        """Fetch a single politician by ID.
+
+        Parameters
+        ----------
+        person_id : str
+            DIP person identifier.
+
+        Returns
+        -------
+        PersonDetail
+            Full politician record including roles.
+        """
         raw = await self._get(f"/person/{person_id}", {"format": "json"})
         return PersonDetail.model_validate(raw)

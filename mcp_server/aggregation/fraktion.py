@@ -17,6 +17,18 @@ def compute_distribution(
     Politicians with no Fraktion are counted under 'Fraktionslos'.
     Data quality issues are surfaced in data_quality_notes, never silently
     dropped.
+
+    Parameters
+    ----------
+    persons : list[Person]
+        Person records to aggregate.
+    wahlperiode : int
+        Wahlperiode number embedded in the returned result.
+
+    Returns
+    -------
+    FraktionDistribution
+        Sorted distribution with percentage shares and data quality notes.
     """
     counts: Counter[str] = Counter()
     missing = 0

@@ -12,12 +12,18 @@ async def complete(
 ) -> tuple[str, str]:
     """Call the configured LLM provider and return (response_text, model_used).
 
-    Args:
-        prompt: User message content.
-        system: System prompt content.
-        settings: Application settings (provider, model, keys).
+    Parameters
+    ----------
+    prompt : str
+        User message content.
+    system : str
+        System prompt content.
+    settings : Settings
+        Application settings (provider, model, keys).
 
-    Returns:
+    Returns
+    -------
+    tuple[str, str]
         Tuple of (response text, model identifier used).
     """
     if settings.llm_provider == "groq":

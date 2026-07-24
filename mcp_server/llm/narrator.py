@@ -1,4 +1,5 @@
-"""LLM narration: convert structured FraktionDistribution into readable prose."""
+"""LLM narration: convert structured FraktionDistribution into readable
+prose."""
 
 import logging
 from pathlib import Path
@@ -25,6 +26,20 @@ async def narrate(
 
     The LLM receives only pre-computed, validated numbers — it cannot
     hallucinate statistics. Output is post-validated before returning.
+
+    Parameters
+    ----------
+    distribution : FraktionDistribution
+        Pre-computed distribution data to narrate.
+    language : {'de', 'en'}, optional
+        Output language; 'de' for German, 'en' for English.
+    style : {'concise', 'detailed'}, optional
+        Narration style.
+
+    Returns
+    -------
+    NarrationResult
+        Generated text together with model identifier and validation status.
     """
     settings = get_settings()
     distribution_json = distribution.model_dump_json(indent=2)

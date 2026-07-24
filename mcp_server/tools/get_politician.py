@@ -17,11 +17,16 @@ async def get_politician(
 ) -> PoliticianListResult:
     """Look up biographical and faction data for a named politician.
 
-    Args:
-        name: Full or partial name, e.g. 'Friedrich Merz'.
-        wahlperiode: Optional Wahlperiode filter, e.g. 20.
+    Parameters
+    ----------
+    name : str
+        Full or partial name, e.g. 'Friedrich Merz'.
+    wahlperiode : int or None, optional
+        Optional Wahlperiode filter, e.g. 20.
 
-    Returns:
+    Returns
+    -------
+    PoliticianListResult
         A list of matching politicians with their Fraktion and metadata.
     """
     settings = get_settings()

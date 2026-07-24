@@ -28,15 +28,22 @@ async def route(
     Retries up to settings.max_router_retries times on Pydantic validation
     failure, appending the error to the prompt so the LLM can self-correct.
 
-    Args:
-        user_query: Free-form user question.
-        settings: Optional settings override (uses get_settings() if None).
+    Parameters
+    ----------
+    user_query : str
+        Free-form user question.
+    settings : Settings or None, optional
+        Settings override; uses get_settings() if None.
 
-    Returns:
+    Returns
+    -------
+    RouterOutput
         RouterOutput with tool name, arguments, and reasoning.
 
-    Raises:
-        RoutingError: If all retry attempts fail.
+    Raises
+    ------
+    RoutingError
+        If all retry attempts fail.
     """
     if settings is None:
         settings = get_settings()

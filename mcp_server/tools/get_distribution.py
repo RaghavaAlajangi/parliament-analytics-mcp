@@ -16,11 +16,15 @@ async def get_fraktion_distribution(wahlperiode: int) -> FraktionDistribution:
     Paginates all politicians from the DIP API, resolves their Fraktion,
     and returns a sorted distribution with data quality notes.
 
-    Args:
-        wahlperiode: Wahlperiode number, e.g. 20 for the 20th Bundestag.
+    Parameters
+    ----------
+    wahlperiode : int
+        Wahlperiode number, e.g. 20 for the 20th Bundestag.
 
-    Returns:
-        FraktionDistribution with percentage shares per Fraktion.
+    Returns
+    -------
+    FraktionDistribution
+        Sorted distribution with percentage shares per Fraktion.
     """
     settings = get_settings()
     persons = []
