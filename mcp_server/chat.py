@@ -19,6 +19,7 @@ import asyncio
 import json
 import logging
 import sys
+import time
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -65,7 +66,21 @@ async def chat_loop() -> None:
             print("Parliament Analytics — autonomous chat mode")
             print("Type your question, or 'quit' to exit.\n")
 
-            messages: list[dict] = []
+            system_prompt = (
+                "You are a German parliamentary data assistant. "
+                "You have access to tools that fetch live data from the "
+                "Bundestag DIP API. "
+                "When a tool returns results, present the actual data "
+                "from the tool response — names, Fraktion, percentages, "
+                "IDs — exactly as returned. "
+                "Never say you cannot retrieve information if a tool was "
+                "called successfully. Never invent or summarise vaguely "
+                "when concrete data is available."
+            )
+
+            messages: list[dict] = [
+                {"role": "system", "content": system_prompt}
+            ]
 
             while True:
                 try:
@@ -123,18 +138,39 @@ async def chat_loop() -> None:
 
                         print(f"  [calling tool: {tool_name}({tool_args})]")
 
-                        result = await session.call_tool(tool_name, tool_args)
+                        t0 = time.perf_counter()
+                        try:
+                            result = await asyncio.wait_for(
+                                session.call_tool(tool_name, tool_args),
+                                timeout=settings.tool_timeout,
+                            )
+                        except asyncio.TimeoutError:
+                            tool_ms = (time.perf_counter() - t0) * 1000
+                            print(
+                                f"  [tool timeout: {tool_name} "
+                                f"after {tool_ms:.0f}ms]"
+                            )
+                            messages.append(
+                                {
+                                    "role": "tool",
+                                    "tool_call_id": tc["id"],
+                                    "content": (
+                                        f"Tool '{tool_name}' timed out after "
+                                        f"{settings.tool_timeout:.0f}s. "
+                                        "The data source may be slow or "
+                                        "rate-limiting. Please try again."
+                                    ),
+                                }
+                            )
+                            continue
+                        tool_ms = (time.perf_counter() - t0) * 1000
                         result_text = (
                             result.content[0].text if result.content else "{}"
                         )
                         if result.isError:
                             print(f"  [tool error: {result_text}]")
                         else:
-                            logger.debug(
-                                "tool result %s: %s",
-                                tool_name,
-                                result_text[:200],
-                            )
+                            print(f"  [tool ok: {tool_name} {tool_ms:.0f}ms]")
 
                         messages.append(
                             {
@@ -153,6 +189,7 @@ async def _groq_chat(
     from groq import AsyncGroq  # type: ignore[import-untyped]
 
     client = AsyncGroq(api_key=settings.groq_api_key)
+    t0 = time.perf_counter()
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=messages,
@@ -160,6 +197,14 @@ async def _groq_chat(
         tool_choice="auto",
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,
+    )
+    llm_ms = (time.perf_counter() - t0) * 1000
+    u = response.usage
+    print(
+        f"  [llm groq/{settings.llm_model} "
+        f"{llm_ms:.0f}ms "
+        f"in={u.prompt_tokens} out={u.completion_tokens} "
+        f"total={u.total_tokens}]"
     )
     msg = response.choices[0].message
     tool_calls = [
@@ -184,6 +229,7 @@ async def _openai_chat(
     from openai import AsyncOpenAI
 
     client = AsyncOpenAI(api_key=settings.openai_api_key)
+    t0 = time.perf_counter()
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=messages,
@@ -191,6 +237,14 @@ async def _openai_chat(
         tool_choice="auto",
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,
+    )
+    llm_ms = (time.perf_counter() - t0) * 1000
+    u = response.usage
+    print(
+        f"  [llm openai/{settings.llm_model} "
+        f"{llm_ms:.0f}ms "
+        f"in={u.prompt_tokens} out={u.completion_tokens} "
+        f"total={u.total_tokens}]"
     )
     msg = response.choices[0].message
     tool_calls = [
@@ -227,12 +281,20 @@ async def _anthropic_chat(
     # Anthropic expects
     anthropic_messages = [m for m in messages if m.get("role") != "tool"]
 
+    t0 = time.perf_counter()
     response = await client.messages.create(
         model=settings.llm_model,
         messages=anthropic_messages,
         tools=anthropic_tools,
         temperature=settings.llm_temperature,
         max_tokens=settings.llm_max_tokens,
+    )
+    llm_ms = (time.perf_counter() - t0) * 1000
+    u = response.usage
+    print(
+        f"  [llm anthropic/{settings.llm_model} "
+        f"{llm_ms:.0f}ms "
+        f"in={u.input_tokens} out={u.output_tokens}]"
     )
     text = next((b.text for b in response.content if hasattr(b, "text")), "")
     tool_calls = [

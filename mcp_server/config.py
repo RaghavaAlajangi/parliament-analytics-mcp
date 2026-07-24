@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     dip_max_concurrent: int = 3
     dip_page_delay: float = 0.0  # seconds between paginated requests
     dip_max_records: int = 300  # hard cap across all pages
+    tool_timeout: float = 60.0  # seconds before a tool call is aborted
 
     # LLM
     llm_provider: Literal["groq", "anthropic", "openai"] = "groq"
@@ -21,7 +22,7 @@ class Settings(BaseSettings):
     openai_api_key: str | None = None
     llm_model: str = "llama-3.3-70b-versatile"
     llm_temperature: float = 0.2
-    llm_max_tokens: int = 1024
+    llm_max_tokens: int = 2048
 
     # Routing
     max_router_retries: int = 3
