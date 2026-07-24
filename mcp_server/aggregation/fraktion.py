@@ -10,7 +10,7 @@ FRAKTIONSLOS = "Fraktionslos"
 
 def compute_distribution(
     persons: list[Person],
-    wahlperiode: int,
+    wahlperiode: int | None = None,
 ) -> FraktionDistribution:
     """Compute Fraktion percentage distribution from a list of Person records.
 
@@ -34,8 +34,13 @@ def compute_distribution(
     missing = 0
 
     for person in persons:
-        if person.fraktion:
-            counts[person.fraktion] += 1
+        fraktion = (
+            person.fraktion_for(wahlperiode)
+            if wahlperiode is not None
+            else person.fraktion
+        )
+        if fraktion:
+            counts[fraktion] += 1
         else:
             counts[FRAKTIONSLOS] += 1
             missing += 1
@@ -51,7 +56,7 @@ def compute_distribution(
 
     if total == 0:
         return FraktionDistribution(
-            wahlperiode=wahlperiode,
+            wahlperiode=wahlperiode or 0,
             total_politicians=0,
             shares=[],
             data_quality_notes=["No politician records found."],
@@ -67,7 +72,7 @@ def compute_distribution(
     ]
 
     return FraktionDistribution(
-        wahlperiode=wahlperiode,
+        wahlperiode=wahlperiode or 0,
         total_politicians=total,
         shares=shares,
         data_quality_notes=notes,
