@@ -1,6 +1,9 @@
 """MCP tool: look up a politician by name."""
 
 import logging
+from typing import Annotated
+
+from pydantic import Field
 
 from mcp_server.config import get_settings
 from mcp_server.dip.client import DIPClient
@@ -17,7 +20,17 @@ MAX_POLITICIAN_RESULTS = 5
 
 
 async def get_politician(
-    name: str, wahlperiode: int | None = None
+    name: Annotated[
+        str,
+        Field(
+            min_length=2,
+            description="Full or partial name, e.g. 'Friedrich Merz'",
+        ),
+    ],
+    wahlperiode: Annotated[
+        int | None,
+        Field(ge=1, description="Optional Wahlperiode filter, e.g. 20"),
+    ] = None,
 ) -> PoliticianListResult:
     """Look up biographical and faction data for a named politician.
 

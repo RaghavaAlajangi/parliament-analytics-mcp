@@ -140,7 +140,7 @@ async def chat_loop() -> None:
                                 session.call_tool(tool_name, tool_args),
                                 timeout=settings.tool_timeout,
                             )
-                        except asyncio.TimeoutError:
+                        except TimeoutError:
                             tool_ms = (time.perf_counter() - t0) * 1000
                             print(
                                 f"  [tool timeout: {tool_name} "

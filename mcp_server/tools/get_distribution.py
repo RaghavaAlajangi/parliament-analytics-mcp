@@ -1,6 +1,9 @@
 """MCP tool: calculate Fraktion distribution for a Wahlperiode."""
 
 import logging
+from typing import Annotated
+
+from pydantic import Field
 
 from mcp_server.aggregation.fraktion import compute_distribution
 from mcp_server.config import get_settings
@@ -10,7 +13,12 @@ from mcp_server.schemas.tool_outputs import FraktionDistribution
 logger = logging.getLogger(__name__)
 
 
-async def get_fraktion_distribution(wahlperiode: int) -> FraktionDistribution:
+async def get_fraktion_distribution(
+    wahlperiode: Annotated[
+        int,
+        Field(ge=1, description="Wahlperiode number, e.g. 20"),
+    ],
+) -> FraktionDistribution:
     """Calculate the percentage share of each Fraktion in a given Wahlperiode.
 
     Paginates all politicians from the DIP API, resolves their Fraktion,
