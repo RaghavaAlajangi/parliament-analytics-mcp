@@ -19,7 +19,7 @@ async def get_politician(
 
     Args:
         name: Full or partial name, e.g. 'Friedrich Merz'.
-        wahlperiode: Optional Wahlperiode filter, e.g. 20.
+        wahlperiode: Optional Wahlperiode filter, e.g. 21.
 
     Returns:
         A list of matching politicians with their Fraktion and metadata.

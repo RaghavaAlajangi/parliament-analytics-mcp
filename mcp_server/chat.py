@@ -65,7 +65,18 @@ async def chat_loop() -> None:
             print("Parliament Analytics — autonomous chat mode")
             print("Type your question, or 'quit' to exit.\n")
 
-            messages: list[dict] = []
+            system_prompt = (
+                "You are a German parliamentary data assistant. "
+                "The current Bundestag is Wahlperiode 21 (elected 2025). "
+                "When the user says 'aktuell' or 'current' without specifying "
+                "a Wahlperiode, use wahlperiode=21. "
+                "Never fabricate parliamentary data — always call a tool. "
+                "To list members of a party, use search_members_by_party. "
+                "Use get_politician only for a specific named individual."
+            )
+            messages: list[dict] = [
+                {"role": "system", "content": system_prompt}
+            ]
 
             while True:
                 try:
