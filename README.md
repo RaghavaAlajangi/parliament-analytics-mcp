@@ -90,11 +90,82 @@ Add to `claude_desktop_config.json`:
 
 ## Tools
 
+### People & Factions
+
 | Tool | Description |
 |---|---|
 | `get_politician` | Look up a politician by name; returns faction and biography data |
 | `get_fraktion_distribution` | Calculates % share per Fraktion for a given Wahlperiode |
 | `narrate_distribution` | Fetches distribution and produces a natural-language analysis |
+
+### Parliamentary Papers (Drucksachen)
+
+| Tool | Description |
+|---|---|
+| `search_drucksachen` | Search papers by title, type, originator, or date |
+| `get_drucksache` | Fetch full metadata for a single paper by DIP ID |
+| `get_drucksache_text` | Fetch the full text content of a paper by DIP ID |
+
+### Legislative Proceedings (Vorgänge)
+
+| Tool | Description |
+|---|---|
+| `search_vorgaenge` | Search proceedings by title, type, status, subject area, or initiator |
+| `get_vorgang` | Fetch full details of a single proceeding by DIP ID |
+
+### Plenary Sessions (Plenarprotokolle)
+
+| Tool | Description |
+|---|---|
+| `search_plenarprotokolle` | Search session records by Wahlperiode or date range |
+| `get_plenarprotokoll` | Fetch full metadata for a single session record by DIP ID |
+| `get_plenarprotokoll_text` | Fetch the full transcript of a session by DIP ID |
+
+### Parliamentary Activities (Aktivitäten)
+
+| Tool | Description |
+|---|---|
+| `search_aktivitaeten` | Search activities (speeches, votes, questions) by person or date |
+| `get_aktivitaet` | Fetch full details of a single activity by DIP ID |
+
+The intended call pattern is **search → get-by-ID → get-text** as needed.
+Search for discovery; by-ID for complete metadata; text only when document
+content must be read or quoted.
+
+## API Design Trade-offs
+
+### Endpoints
+
+The DIP API has six resource types (`person`, `vorgang`, `drucksache`,
+`plenarprotokoll`, `aktivitaet`, `vorgangsposition`). Each exposes list/search,
+by-ID, and full-text variants. All main resource types are covered here except
+`vorgangsposition`, which is a sub-resource of `vorgang` representing individual
+procedural steps — not a standalone retrieval target for natural language queries.
+
+### Filter parameters
+
+Each DIP search endpoint accepts 15–25 filter parameters. Only the subset that
+maps cleanly to natural language is exposed as tool arguments:
+
+**Included:** `titel`, `drucksachetyp`/`vorgangstyp`, `beratungsstand`,
+`wahlperiode`, `urheber`, `initiative`, `sachgebiet`, `f.person`/`f.person_id`,
+date ranges.
+
+**Excluded deliberately:**
+
+| Filter | Why excluded |
+|---|---|
+| `f.gesta` | Internal GESTA reference codes — users won't know these |
+| `f.ratsdok`, `f.kom` | EU Council/Commission document numbers — require prior knowledge of specific codes |
+| `f.deskriptor` | Controlled vocabulary (ANTHES/PARTHES thesaurus) — LLM cannot reliably generate valid terms |
+| `f.dokumentnummer` | Exact document number (e.g. `19/1234`) — if you have it, use the by-ID endpoint instead |
+| `f.frage_nummer` | Question list number within a Drucksache — too granular for natural language |
+| `f.plenarprotokoll`, `f.drucksache`, `f.vorgang` (as filters) | Cross-reference IDs — require a prior tool call to obtain; not naturally guessable |
+
+**The rule:** if filling a filter requires the user to know an internal
+reference code or controlled vocabulary term they couldn't derive from their
+question, it does not belong as a tool parameter. Chain search → get-by-ID
+instead.
 
 ## Project Structure
 
