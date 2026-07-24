@@ -23,6 +23,54 @@ from mcp_server.dip.models import (
 
 logger = logging.getLogger(__name__)
 
+_REDIRECT_CODES = (301, 302, 303, 307, 308)
+
+
+class DIPUnavailableError(Exception):
+    """DIP is temporarily refusing requests (rate limit or bot protection).
+
+    The DIP API sits behind a bot-protection layer (Enodia) that answers
+    throttled or suspicious clients with a redirect to a JavaScript
+    challenge instead of a 429. Both cases are transient and retryable.
+    """
+
+    def __init__(
+        self, message: str, retry_after: float | None = None
+    ) -> None:
+        super().__init__(message)
+        self.retry_after = retry_after
+
+
+def _is_retryable(exc: BaseException) -> bool:
+    """Retry on throttling, transient network errors, and 5xx responses."""
+    if isinstance(exc, (DIPUnavailableError, httpx.TransportError)):
+        return True
+    return (
+        isinstance(exc, httpx.HTTPStatusError)
+        and exc.response.status_code >= 500
+    )
+
+
+def _make_wait(settings: Settings):
+    """Wait strategy: honour Retry-After when sent, else back off
+    exponentially."""
+    exponential = wait_exponential(
+        multiplier=1,
+        min=settings.dip_retry_min_wait,
+        max=settings.dip_retry_max_wait,
+    )
+
+    def _wait(retry_state) -> float:
+        exc = retry_state.outcome.exception() if retry_state.outcome else None
+        if (
+            isinstance(exc, DIPUnavailableError)
+            and exc.retry_after is not None
+        ):
+            return min(exc.retry_after, settings.dip_retry_max_wait)
+        return exponential(retry_state)
+
+    return _wait
+
 
 class DIPClient:
     """Async client for the DIP Bundestag REST API."""
@@ -35,48 +83,63 @@ class DIPClient:
         self._max_records = settings.dip_max_records
         self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
         self._client: httpx.AsyncClient | None = None
+        # Retry settings come from config, so tests and deployments can
+        # tune backoff without touching code
+        self._get = retry(
+            stop=stop_after_attempt(settings.dip_retry_attempts),
+            wait=_make_wait(settings),
+            retry=retry_if_exception(_is_retryable),
+            reraise=True,
+        )(self._request)
 
     async def __aenter__(self) -> "DIPClient":
-        self._client = httpx.AsyncClient(timeout=30.0)
+        # API key travels in the Authorization header, never in the URL,
+        # so it cannot leak into server logs or proxies
+        self._client = httpx.AsyncClient(
+            timeout=30.0,
+            headers={"Authorization": f"ApiKey {self._api_key}"},
+        )
         return self
 
     async def __aexit__(self, *_: Any) -> None:
         if self._client:
             await self._client.aclose()
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception(
-            lambda e: (
-                isinstance(e, httpx.HTTPStatusError)
-                and e.response.status_code >= 500
-            )
-        ),
-    )
-    async def _get(
+    async def _request(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
         assert self._client is not None, (
             "DIPClient must be used as async context manager"
         )
-        all_params = {"apikey": self._api_key, **(params or {})}
         url = f"{self._base_url}{path}"
 
         async with self._semaphore:
-            logger.debug(
-                "DIP GET %s params=%s",
-                path,
-                {k: v for k, v in all_params.items() if k != "apikey"},
-            )
-            response = await self._client.get(url, params=all_params)
+            logger.debug("DIP GET %s params=%s", path, params)
+            response = await self._client.get(url, params=params or {})
 
-        if response.status_code in (301, 302, 303, 307, 308):
-            raise httpx.HTTPStatusError(
-                f"DIP API returned a redirect ({response.status_code}) — "
-                "the API key may be invalid, expired, or rate-limited. ",
-                request=response.request,
-                response=response,
+        if (
+            response.status_code == 429
+            or response.status_code in _REDIRECT_CODES
+        ):
+            retry_after_header = response.headers.get("retry-after")
+            try:
+                retry_after = float(retry_after_header)
+            except (TypeError, ValueError):
+                retry_after = None
+            reason = (
+                "rate limited (HTTP 429)"
+                if response.status_code == 429
+                else "redirected to the bot-protection challenge "
+                f"(HTTP {response.status_code})"
+            )
+            logger.warning("DIP API %s on GET %s, backing off", reason, path)
+            raise DIPUnavailableError(
+                f"DIP API {reason}. The service throttles automated "
+                "clients. If this persists: wait a few minutes, verify "
+                "the API key is current (the public key rotates yearly), "
+                "or request a personal key from "
+                "parlamentsdokumentation@bundestag.de.",
+                retry_after=retry_after,
             )
         if not response.is_success:
             logger.error(
