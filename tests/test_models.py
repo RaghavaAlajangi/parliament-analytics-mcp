@@ -29,3 +29,23 @@ class TestFullName:
 
     def test_empty_when_nothing_available(self) -> None:
         assert Person(id="1").full_name == ""
+
+
+class TestFieldNormalisation:
+    def test_funktion_as_string_is_wrapped(self) -> None:
+        p = Person.model_validate(
+            {"id": "1", "funktion": "LMin Soz u. Frauen"}
+        )
+        assert p.funktion == ["LMin Soz u. Frauen"]
+
+    def test_funktion_as_list_is_kept(self) -> None:
+        p = Person.model_validate({"id": "1", "funktion": ["MdB", "Min"]})
+        assert p.funktion == ["MdB", "Min"]
+
+    def test_fraktion_as_list_takes_first(self) -> None:
+        p = Person.model_validate({"id": "1", "fraktion": ["SPD", "CDU"]})
+        assert p.fraktion == "SPD"
+
+    def test_wahlperiode_maps_to_wahlperiode_nummer(self) -> None:
+        p = Person.model_validate({"id": "1", "wahlperiode": [19, 20]})
+        assert p.wahlperiode_nummer == [19, 20]

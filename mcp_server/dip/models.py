@@ -35,6 +35,13 @@ class Person(BaseModel):
         if isinstance(fraktion, list):
             data["fraktion"] = fraktion[0] if fraktion else None
 
+        # funktion is a plain string per the API spec, but the search
+        # endpoint may return it multi-valued; accept both — a validation
+        # failure here would silently drop the whole person record
+        funktion = data.get("funktion")
+        if isinstance(funktion, str):
+            data["funktion"] = [funktion]
+
         # wahlperiode (list endpoint) → wahlperiode_nummer
         if "wahlperiode_nummer" not in data and "wahlperiode" in data:
             data["wahlperiode_nummer"] = data["wahlperiode"]
