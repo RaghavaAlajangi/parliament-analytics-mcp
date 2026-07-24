@@ -2,6 +2,7 @@
 
 from typing import Literal
 
+from pydantic import ValidationError
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -45,3 +46,22 @@ class Settings(BaseSettings):
 
 def get_settings() -> Settings:
     return Settings()
+
+
+def load_settings_or_exit() -> Settings:
+    """Load settings at process startup with a readable failure mode.
+
+    A missing or incomplete .env produces a clear one-line error instead
+    of a raw validation traceback on the first tool call.
+    """
+    try:
+        return Settings()
+    except ValidationError as exc:
+        missing = ", ".join(
+            ".".join(str(part) for part in err["loc"]).upper()
+            for err in exc.errors()
+        )
+        raise SystemExit(
+            f"Configuration error ({missing}): copy .env.example to .env "
+            "and fill in the required values."
+        ) from exc

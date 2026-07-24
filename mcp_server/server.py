@@ -4,6 +4,7 @@ import logging
 
 from fastmcp import FastMCP
 
+from mcp_server.config import load_settings_or_exit
 from mcp_server.tools.get_distribution import get_fraktion_distribution
 from mcp_server.tools.get_politician import get_politician
 from mcp_server.tools.narrate import narrate_distribution
@@ -27,6 +28,7 @@ mcp.tool()(narrate_distribution)
 
 def main() -> None:
     logging.basicConfig(level=logging.INFO)
+    load_settings_or_exit()
     logger.info("Starting Parliament Analytics MCP server")
     mcp.run()
 

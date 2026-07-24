@@ -24,7 +24,7 @@ import time
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 
-from mcp_server.config import get_settings
+from mcp_server.config import get_settings, load_settings_or_exit
 
 logger = logging.getLogger(__name__)
 
@@ -259,6 +259,7 @@ async def _openai_chat(
 
 def main() -> None:
     logging.basicConfig(level=logging.WARNING)
+    load_settings_or_exit()
     try:
         asyncio.run(chat_loop())
     except KeyboardInterrupt:
