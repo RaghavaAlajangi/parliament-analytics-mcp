@@ -45,8 +45,8 @@ async def chat_loop() -> None:
             tools_response = await session.list_tools()
             mcp_tools = tools_response.tools
             logger.info(
-                "Connected to MCP server, tools: %s",
-                [t.name for t in mcp_tools],
+                f"Connected to MCP server, "
+                f"tools: {[t.name for t in mcp_tools]}",
             )
 
             # Convert MCP tool schemas to the format the LLM provider expects
@@ -80,15 +80,24 @@ async def chat_loop() -> None:
 
                 messages.append({"role": "user", "content": user_input})
 
-                # Agentic loop: LLM may call tools multiple times before answering
+                # Agentic loop: LLM may call tools multiple times before
+                # answering
                 while True:
                     if settings.llm_provider == "groq":
                         response_text, tool_calls = await _groq_chat(
                             messages, tool_schemas, settings
                         )
-                    else:
+                    elif settings.llm_provider == "anthropic":
                         response_text, tool_calls = await _anthropic_chat(
                             messages, tool_schemas, settings
+                        )
+                    elif settings.llm_provider == "openai":
+                        response_text, tool_calls = await _openai_chat(
+                            messages, tool_schemas, settings
+                        )
+                    else:
+                        raise ValueError(
+                            f"Unknown LLM provider: {settings.llm_provider}"
                         )
 
                     if not tool_calls:
@@ -118,6 +127,14 @@ async def chat_loop() -> None:
                         result_text = (
                             result.content[0].text if result.content else "{}"
                         )
+                        if result.isError:
+                            print(f"  [tool error: {result_text}]")
+                        else:
+                            logger.debug(
+                                "tool result %s: %s",
+                                tool_name,
+                                result_text[:200],
+                            )
 
                         messages.append(
                             {
@@ -159,6 +176,37 @@ async def _groq_chat(
     return msg.content or "", tool_calls
 
 
+async def _openai_chat(
+    messages: list[dict],
+    tools: list[dict],
+    settings,
+) -> tuple[str, list[dict]]:
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    response = await client.chat.completions.create(
+        model=settings.llm_model,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        temperature=settings.llm_temperature,
+        max_tokens=settings.llm_max_tokens,
+    )
+    msg = response.choices[0].message
+    tool_calls = [
+        {
+            "id": tc.id,
+            "type": "function",
+            "function": {
+                "name": tc.function.name,
+                "arguments": tc.function.arguments,
+            },
+        }
+        for tc in (msg.tool_calls or [])
+    ]
+    return msg.content or "", tool_calls
+
+
 async def _anthropic_chat(
     messages: list[dict],
     tools: list[dict],
@@ -175,7 +223,8 @@ async def _anthropic_chat(
         }
         for t in tools
     ]
-    # Filter out tool-result messages for the system/user/assistant turns Anthropic expects
+    # Filter out tool-result messages for the system/user/assistant turns
+    # Anthropic expects
     anthropic_messages = [m for m in messages if m.get("role") != "tool"]
 
     response = await client.messages.create(

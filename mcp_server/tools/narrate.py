@@ -24,13 +24,19 @@ async def narrate_distribution(
     structured result to an LLM for narration. The LLM only sees pre-computed
     numbers — it cannot hallucinate statistics.
 
-    Args:
-        wahlperiode: Wahlperiode number, e.g. 20.
-        language: Output language — 'de' for German, 'en' for English.
-        style: 'concise' for a short summary, 'detailed' for full analysis.
+    Parameters
+    ----------
+    wahlperiode : int
+        Wahlperiode number, e.g. 20.
+    language : {'de', 'en'}, optional
+        Output language — 'de' for German, 'en' for English.
+    style : {'concise', 'detailed'}, optional
+        'concise' for a short summary, 'detailed' for full analysis.
 
-    Returns:
-        NarrationResult with the generated text and validation status.
+    Returns
+    -------
+    NarrationResult
+        Generated text with validation status.
     """
     from mcp_server.llm.narrator import (
         narrate,  # local import to avoid circular

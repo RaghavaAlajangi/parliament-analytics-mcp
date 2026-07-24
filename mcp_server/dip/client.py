@@ -1,4 +1,5 @@
-"""Async DIP Bundestag API client with pagination, retries, and rate limiting."""
+"""Async DIP Bundestag API client with pagination, retries, and rate
+limiting."""
 
 import asyncio
 import logging
@@ -6,12 +7,16 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from mcp_server.config import Settings
 from mcp_server.dip.models import (
     DIPListResponse,
-    Fraktion,
     Person,
     PersonDetail,
 )
@@ -26,6 +31,7 @@ class DIPClient:
         self._base_url = settings.dip_base_url.rstrip("/")
         self._api_key = settings.dip_api_key
         self._page_size = settings.dip_page_size
+        self._page_delay = settings.dip_page_delay
         self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
         self._client: httpx.AsyncClient | None = None
 
@@ -40,6 +46,10 @@ class DIPClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
+        retry=retry_if_exception(
+            lambda e: isinstance(e, httpx.HTTPStatusError)
+            and e.response.status_code >= 500
+        ),
     )
     async def _get(
         self, path: str, params: dict[str, Any] | None = None
@@ -58,6 +68,21 @@ class DIPClient:
             )
             response = await self._client.get(url, params=all_params)
 
+        if response.status_code in (301, 302, 303, 307, 308):
+            raise httpx.HTTPStatusError(
+                f"DIP API returned a redirect ({response.status_code}) — "
+                "the API key may be invalid, expired, or rate-limited. "
+                f"Location: {response.headers.get('location', 'unknown')}",
+                request=response.request,
+                response=response,
+            )
+        if not response.is_success:
+            logger.error(
+                "DIP API error: GET %s -> HTTP %d: %s",
+                path,
+                response.status_code,
+                response.text[:200],
+            )
         response.raise_for_status()
         return response.json()
 
@@ -66,8 +91,20 @@ class DIPClient:
         wahlperiode: int | None = None,
         search: str | None = None,
     ) -> AsyncIterator[Person]:
-        """Paginate all persons, optionally filtered by wahlperiode or search
-        term."""
+        """Paginate all persons, optionally filtered by wahlperiode or search.
+
+        Parameters
+        ----------
+        wahlperiode : int or None, optional
+            Filter results to this Wahlperiode number.
+        search : str or None, optional
+            Free-text search term matched against person names.
+
+        Yields
+        ------
+        Person
+            Validated Person records from the DIP API.
+        """
         params: dict[str, Any] = {"format": "json", "rows": self._page_size}
         if wahlperiode is not None:
             params["f.wahlperiode"] = wahlperiode
@@ -92,22 +129,23 @@ class DIPClient:
                     )
 
             cursor = resp.cursor
+            if cursor and self._page_delay > 0:
+                await asyncio.sleep(self._page_delay)
             if not cursor:
                 break
 
     async def get_person(self, person_id: str) -> PersonDetail:
-        """Fetch a single politician by ID."""
+        """Fetch a single politician by ID.
+
+        Parameters
+        ----------
+        person_id : str
+            DIP person identifier.
+
+        Returns
+        -------
+        PersonDetail
+            Full politician record including roles.
+        """
         raw = await self._get(f"/person/{person_id}", {"format": "json"})
         return PersonDetail.model_validate(raw)
-
-    async def get_fraktionen(
-        self, wahlperiode: int | None = None
-    ) -> list[Fraktion]:
-        """Fetch all Fraktionen, optionally filtered by wahlperiode."""
-        params: dict[str, Any] = {"format": "json", "rows": 50}
-        if wahlperiode is not None:
-            params["f.wahlperiode"] = wahlperiode
-
-        raw = await self._get("/fraktion", params)
-        resp = DIPListResponse.model_validate(raw)
-        return [Fraktion.model_validate(doc) for doc in resp.documents]

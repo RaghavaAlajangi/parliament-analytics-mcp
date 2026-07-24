@@ -11,11 +11,13 @@ class Settings(BaseSettings):
     dip_base_url: str = "https://search.dip.bundestag.de/api/v1"
     dip_page_size: int = 100
     dip_max_concurrent: int = 3
+    dip_page_delay: float = 0.5  # seconds between paginated requests
 
     # LLM
-    llm_provider: Literal["groq", "anthropic"] = "groq"
+    llm_provider: Literal["groq", "anthropic", "openai"] = "groq"
     groq_api_key: str | None = None
     anthropic_api_key: str | None = None
+    openai_api_key: str | None = None
     llm_model: str = "llama-3.3-70b-versatile"
     llm_temperature: float = 0.2
     llm_max_tokens: int = 1024
