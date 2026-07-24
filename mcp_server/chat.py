@@ -87,9 +87,17 @@ async def chat_loop() -> None:
                         response_text, tool_calls = await _groq_chat(
                             messages, tool_schemas, settings
                         )
-                    else:
+                    elif settings.llm_provider == "anthropic":
                         response_text, tool_calls = await _anthropic_chat(
                             messages, tool_schemas, settings
+                        )
+                    elif settings.llm_provider == "openai":
+                        response_text, tool_calls = await _openai_chat(
+                            messages, tool_schemas, settings
+                        )
+                    else:
+                        raise ValueError(
+                            f"Unknown LLM provider: {settings.llm_provider}"
                         )
 
                     if not tool_calls:
@@ -119,6 +127,14 @@ async def chat_loop() -> None:
                         result_text = (
                             result.content[0].text if result.content else "{}"
                         )
+                        if result.isError:
+                            print(f"  [tool error: {result_text}]")
+                        else:
+                            logger.debug(
+                                "tool result %s: %s",
+                                tool_name,
+                                result_text[:200],
+                            )
 
                         messages.append(
                             {
@@ -137,6 +153,37 @@ async def _groq_chat(
     from groq import AsyncGroq  # type: ignore[import-untyped]
 
     client = AsyncGroq(api_key=settings.groq_api_key)
+    response = await client.chat.completions.create(
+        model=settings.llm_model,
+        messages=messages,
+        tools=tools,
+        tool_choice="auto",
+        temperature=settings.llm_temperature,
+        max_tokens=settings.llm_max_tokens,
+    )
+    msg = response.choices[0].message
+    tool_calls = [
+        {
+            "id": tc.id,
+            "type": "function",
+            "function": {
+                "name": tc.function.name,
+                "arguments": tc.function.arguments,
+            },
+        }
+        for tc in (msg.tool_calls or [])
+    ]
+    return msg.content or "", tool_calls
+
+
+async def _openai_chat(
+    messages: list[dict],
+    tools: list[dict],
+    settings,
+) -> tuple[str, list[dict]]:
+    from openai import AsyncOpenAI
+
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
     response = await client.chat.completions.create(
         model=settings.llm_model,
         messages=messages,
