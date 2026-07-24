@@ -109,7 +109,7 @@ class DIPClient:
         if wahlperiode is not None:
             params["f.wahlperiode"] = wahlperiode
         if search:
-            params["q"] = search
+            params["f.person"] = search
 
         cursor: str | None = None
 

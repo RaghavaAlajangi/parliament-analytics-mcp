@@ -7,9 +7,13 @@ from mcp_server.dip.client import DIPClient
 from mcp_server.schemas.tool_outputs import (
     PoliticianListResult,
     PoliticianResult,
+    RoleEntry,
 )
 
 logger = logging.getLogger(__name__)
+
+
+MAX_POLITICIAN_RESULTS = 5
 
 
 async def get_politician(
@@ -17,10 +21,14 @@ async def get_politician(
 ) -> PoliticianListResult:
     """Look up biographical and faction data for a named politician.
 
+    Uses the DIP f.person filter which matches both first and last name,
+    supporting both hyphenated and space-separated forms.
+
     Parameters
     ----------
     name : str
-        Full or partial name, e.g. 'Friedrich Merz'.
+        Full or partial name, e.g. 'Friedrich Merz' or
+        'Steinmeier Frank-Walter'.
     wahlperiode : int or None, optional
         Optional Wahlperiode filter, e.g. 20.
 
@@ -40,14 +48,26 @@ async def get_politician(
                 PoliticianResult(
                     id=person.id,
                     full_name=person.full_name,
+                    titel=person.titel,
+                    funktion=person.funktion,
                     fraktion=person.fraktion,
                     wahlperiode=person.wahlperiode_nummer,
+                    roles=[
+                        RoleEntry(
+                            fraktion=r.fraktion,
+                            ressort_titel=r.ressort_titel,
+                            wahlperiode_nummer=r.wahlperiode_nummer,
+                        )
+                        for r in person.person_roles
+                    ],
                     biography_url=person.basisdaten_url,
                 )
             )
+            if len(results) >= MAX_POLITICIAN_RESULTS:
+                break
 
     logger.info(
-        f"get_politician query={name} wahlperiode={wahlperiode} "
+        f"get_politician query={name!r} wahlperiode={wahlperiode} "
         f"found={len(results)}"
     )
 
