@@ -80,7 +80,6 @@ class DIPClient:
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.dip_base_url.rstrip("/")
         self._api_key = settings.dip_api_key
-        self._page_size = settings.dip_page_size
         self._page_delay = settings.dip_page_delay
         self._max_records = settings.dip_max_records
         self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
@@ -191,7 +190,9 @@ class DIPClient:
         Person
             Validated Person records from the DIP API.
         """
-        params: dict[str, Any] = {"format": "json", "rows": self._page_size}
+        # The API paginates with a cursor at a fixed page size; there is
+        # no documented page-size parameter
+        params: dict[str, Any] = {"format": "json"}
         if wahlperiode is not None:
             params["f.wahlperiode"] = wahlperiode
         if search:

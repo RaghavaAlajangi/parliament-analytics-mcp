@@ -9,7 +9,6 @@ class Settings(BaseSettings):
     # DIP API
     dip_api_key: str
     dip_base_url: str = "https://search.dip.bundestag.de/api/v1"
-    dip_page_size: int = 100
     dip_max_concurrent: int = 3
     dip_page_delay: float = 0.0  # seconds between paginated requests
     # Runaway guard only — must exceed the size of one Wahlperiode
@@ -37,8 +36,10 @@ class Settings(BaseSettings):
     # Observability
     log_level: str = "INFO"
 
+    # extra="ignore": unknown keys in .env (e.g. left over from older
+    # versions) must never crash startup
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8"
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
 
 
