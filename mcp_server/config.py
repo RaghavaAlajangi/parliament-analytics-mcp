@@ -11,7 +11,8 @@ class Settings(BaseSettings):
     dip_base_url: str = "https://search.dip.bundestag.de/api/v1"
     dip_page_size: int = 100
     dip_max_concurrent: int = 3
-    dip_page_delay: float = 0.5  # seconds between paginated requests
+    dip_page_delay: float = 0.0  # seconds between paginated requests
+    dip_max_records: int = 300  # hard cap across all pages
 
     # LLM
     llm_provider: Literal["groq", "anthropic", "openai"] = "groq"

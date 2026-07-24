@@ -3,6 +3,7 @@ limiting."""
 
 import asyncio
 import logging
+import sys
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -32,6 +33,7 @@ class DIPClient:
         self._api_key = settings.dip_api_key
         self._page_size = settings.dip_page_size
         self._page_delay = settings.dip_page_delay
+        self._max_records = settings.dip_max_records
         self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
         self._client: httpx.AsyncClient | None = None
 
@@ -47,8 +49,10 @@ class DIPClient:
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
         retry=retry_if_exception(
-            lambda e: isinstance(e, httpx.HTTPStatusError)
-            and e.response.status_code >= 500
+            lambda e: (
+                isinstance(e, httpx.HTTPStatusError)
+                and e.response.status_code >= 500
+            )
         ),
     )
     async def _get(
@@ -71,8 +75,7 @@ class DIPClient:
         if response.status_code in (301, 302, 303, 307, 308):
             raise httpx.HTTPStatusError(
                 f"DIP API returned a redirect ({response.status_code}) — "
-                "the API key may be invalid, expired, or rate-limited. "
-                f"Location: {response.headers.get('location', 'unknown')}",
+                "the API key may be invalid, expired, or rate-limited. ",
                 request=response.request,
                 response=response,
             )
@@ -112,21 +115,38 @@ class DIPClient:
             params["f.person"] = search
 
         cursor: str | None = None
+        total_yielded = 0
 
         while True:
             if cursor:
                 params["cursor"] = cursor
 
-            raw = await self._get("/person", params)
+            raw = await asyncio.wait_for(
+                self._get("/person", params), timeout=15.0
+            )
             resp = DIPListResponse.model_validate(raw)
 
             for doc in resp.documents:
                 try:
                     yield Person.model_validate(doc)
+                    total_yielded += 1
                 except Exception:
                     logger.warning(
                         f"Could not parse person document: {doc.get('id')}"
                     )
+
+            print(
+                f"  [dip {total_yielded}/{resp.numFound} records]",
+                file=sys.stderr,
+                flush=True,
+            )
+
+            if total_yielded >= self._max_records:
+                logger.warning(
+                    "DIP max_records cap (%d) reached, stopping pagination",
+                    self._max_records,
+                )
+                break
 
             cursor = resp.cursor
             if cursor and self._page_delay > 0:

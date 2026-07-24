@@ -38,4 +38,13 @@ async def get_fraktion_distribution(wahlperiode: int) -> FraktionDistribution:
         f"total_persons={len(persons)}"
     )
 
-    return compute_distribution(persons, wahlperiode)
+    result = compute_distribution(persons, wahlperiode)
+
+    if len(persons) >= settings.dip_max_records:
+        result.data_quality_notes.append(
+            f"Result is based on a sample of {len(persons)} records "
+            f"(capped at dip_max_records={settings.dip_max_records}). "
+            "Percentages are approximate."
+        )
+
+    return result
