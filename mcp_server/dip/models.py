@@ -26,8 +26,8 @@ class Person(BaseModel):
     geburtsdatum: str | None = None
     geburtsort: str | None = None
     geschlecht: str | None = None
-    # Fraktion may be embedded directly in list response
     fraktion: str | None = None
+    bundesland: str | None = None
     wahlperiode_nummer: list[int] = Field(default_factory=list)
     basisdaten_url: str | None = None
 
@@ -43,13 +43,111 @@ class PersonDetail(Person):
     roles: list[PersonRole] = Field(default_factory=list)
 
 
-class Fraktion(BaseModel):
-    """A parliamentary group (Fraktion) from GET /fraktion."""
+# --- Drucksache ---
+
+class Urheber(BaseModel):
+    titel: str | None = None
+    rolle: str | None = None
+
+
+class Drucksache(BaseModel):
+    """A parliamentary paper from GET /drucksache list."""
 
     id: str
-    bezeichnung: str
-    wahlperiode_nummer: list[int] = Field(default_factory=list)
+    typ: str | None = None
+    dokumentart: str | None = None
+    drucksachetyp: str | None = None
+    dokumentnummer: str | None = None
+    wahlperiode: int | None = None
+    herausgeber: str | None = None
+    datum: str | None = None
+    titel: str | None = None
+    autoren_anzahl: int = 0
+    vorgangsbezug_anzahl: int = 0
+    urheber: list[Urheber] = Field(default_factory=list)
 
+
+class DrucksacheDetail(Drucksache):
+    """Full detail from GET /drucksache/{id}."""
+
+    anlagen: str | None = None
+    pdf_hash: str | None = None
+
+
+class DrucksacheText(DrucksacheDetail):
+    """Full text + metadata from GET /drucksache-text/{id}."""
+
+    text: str | None = None
+
+
+# --- Vorgang ---
+
+class VorgangDeskriptor(BaseModel):
+    name: str | None = None
+    typ: str | None = None
+
+
+class Vorgang(BaseModel):
+    """A legislative proceeding from GET /vorgang list."""
+
+    id: str
+    typ: str | None = None
+    beratungsstand: str | None = None
+    vorgangstyp: str | None = None
+    wahlperiode: int | None = None
+    initiative: list[str] = Field(default_factory=list)
+    datum: str | None = None
+    titel: str
+    abstract: str | None = None
+    sachgebiet: list[str] = Field(default_factory=list)
+    deskriptor: list[VorgangDeskriptor] = Field(default_factory=list)
+    gesta: str | None = None
+    zustimmungsbeduerftigkeit: list[str] = Field(default_factory=list)
+    mitteilung: str | None = None
+
+
+# --- Plenarprotokoll ---
+
+class Plenarprotokoll(BaseModel):
+    """A plenary session record from GET /plenarprotokoll list."""
+
+    id: str
+    typ: str | None = None
+    dokumentart: str | None = None
+    dokumentnummer: str | None = None
+    wahlperiode: int | None = None
+    herausgeber: str | None = None
+    datum: str | None = None
+    titel: str | None = None
+    vorgangsbezug_anzahl: int = 0
+    sitzungsbemerkung: str | None = None
+    pdf_hash: str | None = None
+
+
+class PlenarprotokollText(Plenarprotokoll):
+    """Full text + metadata from GET /plenarprotokoll-text/{id}."""
+
+    text: str | None = None
+
+
+# --- Aktivitaet ---
+
+class Aktivitaet(BaseModel):
+    """A parliamentary activity (speech, vote, etc.) from GET /aktivitaet."""
+
+    id: str
+    aktivitaetsart: str | None = None
+    typ: str | None = None
+    dokumentart: str | None = None
+    wahlperiode: int | None = None
+    datum: str | None = None
+    titel: str | None = None
+    person_id: str | None = None
+    vorgangsbezug_anzahl: int = 0
+    abstract: str | None = None
+
+
+# --- Generic list wrapper ---
 
 class DIPListResponse(BaseModel):
     """Generic paginated list response wrapper from the DIP API."""
