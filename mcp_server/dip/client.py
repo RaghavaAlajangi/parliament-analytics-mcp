@@ -7,7 +7,12 @@ from collections.abc import AsyncIterator
 from typing import Any
 
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import (
+    retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 from mcp_server.config import Settings
 from mcp_server.dip.models import (
@@ -26,6 +31,7 @@ class DIPClient:
         self._base_url = settings.dip_base_url.rstrip("/")
         self._api_key = settings.dip_api_key
         self._page_size = settings.dip_page_size
+        self._page_delay = settings.dip_page_delay
         self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
         self._client: httpx.AsyncClient | None = None
 
@@ -40,6 +46,10 @@ class DIPClient:
     @retry(
         stop=stop_after_attempt(3),
         wait=wait_exponential(multiplier=1, min=1, max=8),
+        retry=retry_if_exception(
+            lambda e: isinstance(e, httpx.HTTPStatusError)
+            and e.response.status_code >= 500
+        ),
     )
     async def _get(
         self, path: str, params: dict[str, Any] | None = None
@@ -58,6 +68,21 @@ class DIPClient:
             )
             response = await self._client.get(url, params=all_params)
 
+        if response.status_code in (301, 302, 303, 307, 308):
+            raise httpx.HTTPStatusError(
+                f"DIP API returned a redirect ({response.status_code}) — "
+                "the API key may be invalid, expired, or rate-limited. "
+                f"Location: {response.headers.get('location', 'unknown')}",
+                request=response.request,
+                response=response,
+            )
+        if not response.is_success:
+            logger.error(
+                "DIP API error: GET %s -> HTTP %d: %s",
+                path,
+                response.status_code,
+                response.text[:200],
+            )
         response.raise_for_status()
         return response.json()
 
@@ -104,6 +129,8 @@ class DIPClient:
                     )
 
             cursor = resp.cursor
+            if cursor and self._page_delay > 0:
+                await asyncio.sleep(self._page_delay)
             if not cursor:
                 break
 
