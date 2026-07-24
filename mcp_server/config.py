@@ -16,9 +16,8 @@ class Settings(BaseSettings):
     tool_timeout: float = 60.0  # seconds before a tool call is aborted
 
     # LLM
-    llm_provider: Literal["groq", "anthropic", "openai"] = "groq"
+    llm_provider: Literal["groq", "openai"] = "groq"
     groq_api_key: str | None = None
-    anthropic_api_key: str | None = None
     openai_api_key: str | None = None
     llm_model: str = "llama-3.3-70b-versatile"
     llm_temperature: float = 0.2

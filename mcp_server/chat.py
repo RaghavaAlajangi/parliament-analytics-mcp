@@ -11,7 +11,7 @@ Usage:
     # Terminal 2: start the chat client
     python -m mcp_server.chat
 
-The chat client uses the Groq (or Anthropic) API with native tool-calling,
+The chat client uses the Groq (or OpenAI) API with native tool-calling,
 passing the MCP server's tool schemas directly to the LLM.
 """
 
@@ -100,10 +100,6 @@ async def chat_loop() -> None:
                 while True:
                     if settings.llm_provider == "groq":
                         response_text, tool_calls = await _groq_chat(
-                            messages, tool_schemas, settings
-                        )
-                    elif settings.llm_provider == "anthropic":
-                        response_text, tool_calls = await _anthropic_chat(
                             messages, tool_schemas, settings
                         )
                     elif settings.llm_provider == "openai":
@@ -259,54 +255,6 @@ async def _openai_chat(
         for tc in (msg.tool_calls or [])
     ]
     return msg.content or "", tool_calls
-
-
-async def _anthropic_chat(
-    messages: list[dict],
-    tools: list[dict],
-    settings,
-) -> tuple[str, list[dict]]:
-    import anthropic
-
-    client = anthropic.AsyncAnthropic(api_key=settings.anthropic_api_key)
-    anthropic_tools = [
-        {
-            "name": t["function"]["name"],
-            "description": t["function"]["description"],
-            "input_schema": t["function"]["parameters"],
-        }
-        for t in tools
-    ]
-    # Filter out tool-result messages for the system/user/assistant turns
-    # Anthropic expects
-    anthropic_messages = [m for m in messages if m.get("role") != "tool"]
-
-    t0 = time.perf_counter()
-    response = await client.messages.create(
-        model=settings.llm_model,
-        messages=anthropic_messages,
-        tools=anthropic_tools,
-        temperature=settings.llm_temperature,
-        max_tokens=settings.llm_max_tokens,
-    )
-    llm_ms = (time.perf_counter() - t0) * 1000
-    u = response.usage
-    print(
-        f"  [llm anthropic/{settings.llm_model} "
-        f"{llm_ms:.0f}ms "
-        f"in={u.input_tokens} out={u.output_tokens}]"
-    )
-    text = next((b.text for b in response.content if hasattr(b, "text")), "")
-    tool_calls = [
-        {
-            "id": b.id,
-            "type": "function",
-            "function": {"name": b.name, "arguments": json.dumps(b.input)},
-        }
-        for b in response.content
-        if b.type == "tool_use"
-    ]
-    return text, tool_calls
 
 
 def main() -> None:
