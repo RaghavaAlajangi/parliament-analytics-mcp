@@ -4,7 +4,8 @@ Your code explicitly routes, calls tools, and narrates.
 LLM is used only for intent extraction and final narration.
 
 Usage:
-    python -m mcp_server.cli "Wie ist die Fraktionsverteilung in der 20. Wahlperiode?"
+    python -m mcp_server.cli "Wie ist die Fraktionsverteilung in der
+    20. Wahlperiode?"
     python -m mcp_server.cli "Wer ist Friedrich Merz?"
 """
 
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 async def run(query: str) -> None:
     routing = await route(query)
-    logger.info("Routed to tool=%s args=%s", routing.tool, routing.arguments)
+    logger.info(f"Routed to tool={routing.tool} args={routing.arguments}")
 
     if routing.tool == "get_politician":
         result = await get_politician(**routing.arguments)

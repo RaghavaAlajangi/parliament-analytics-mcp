@@ -1,4 +1,5 @@
-"""Async DIP Bundestag API client with pagination, retries, and rate limiting."""
+"""Async DIP Bundestag API client with pagination, retries, and rate
+limiting."""
 
 import asyncio
 import logging
@@ -98,4 +99,3 @@ class DIPClient:
         """Fetch a single politician by ID."""
         raw = await self._get(f"/person/{person_id}", {"format": "json"})
         return PersonDetail.model_validate(raw)
-

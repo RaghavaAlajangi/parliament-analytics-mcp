@@ -47,10 +47,9 @@ async def _complete_groq(
     )
     text = response.choices[0].message.content or ""
     logger.info(
-        "LLM call provider=groq model=%s prompt_tokens=%s completion_tokens=%s",
-        settings.llm_model,
-        response.usage.prompt_tokens if response.usage else "?",
-        response.usage.completion_tokens if response.usage else "?",
+        f"LLM call provider=groq model={settings.llm_model} "
+        f"prompt_tokens={response.usage.prompt_tokens} "
+        f"completion_tokens={response.usage.completion_tokens}"
     )
     return text, settings.llm_model
 
@@ -75,9 +74,8 @@ async def _complete_anthropic(
     )
     text = response.content[0].text if response.content else ""
     logger.info(
-        "LLM call provider=anthropic model=%s input_tokens=%s output_tokens=%s",
-        settings.llm_model,
-        response.usage.input_tokens,
-        response.usage.output_tokens,
+        f"LLM call provider=anthropic model={settings.llm_model} "
+        f"input_tokens={response.usage.input_tokens} "
+        f"output_tokens={response.usage.output_tokens}"
     )
     return text, settings.llm_model

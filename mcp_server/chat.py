@@ -45,8 +45,8 @@ async def chat_loop() -> None:
             tools_response = await session.list_tools()
             mcp_tools = tools_response.tools
             logger.info(
-                "Connected to MCP server, tools: %s",
-                [t.name for t in mcp_tools],
+                f"Connected to MCP server, "
+                f"tools: {[t.name for t in mcp_tools]}",
             )
 
             # Convert MCP tool schemas to the format the LLM provider expects
@@ -80,7 +80,8 @@ async def chat_loop() -> None:
 
                 messages.append({"role": "user", "content": user_input})
 
-                # Agentic loop: LLM may call tools multiple times before answering
+                # Agentic loop: LLM may call tools multiple times before
+                # answering
                 while True:
                     if settings.llm_provider == "groq":
                         response_text, tool_calls = await _groq_chat(
@@ -175,7 +176,8 @@ async def _anthropic_chat(
         }
         for t in tools
     ]
-    # Filter out tool-result messages for the system/user/assistant turns Anthropic expects
+    # Filter out tool-result messages for the system/user/assistant turns
+    # Anthropic expects
     anthropic_messages = [m for m in messages if m.get("role") != "tool"]
 
     response = await client.messages.create(

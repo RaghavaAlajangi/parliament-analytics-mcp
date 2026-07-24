@@ -47,7 +47,8 @@ async def route(
 
     for attempt in range(1, settings.max_router_retries + 1):
         if last_error:
-            prompt = f"{user_query}\n\nPrevious attempt failed with: {last_error}\nPlease correct and try again."
+            prompt = f"{user_query}\n\nPrevious attempt failed with: "
+            f"{last_error}\nPlease correct and try again."
 
         raw, _ = await complete(
             prompt=prompt, system=system, settings=settings
@@ -64,15 +65,13 @@ async def route(
             )
             parsed = RouterOutput.model_validate(json.loads(cleaned))
             logger.info(
-                "Router success attempt=%d tool=%s reasoning=%r",
-                attempt,
-                parsed.tool,
-                parsed.reasoning,
+                f"Router success attempt={attempt} tool={parsed.tool} "
+                f"reasoning={parsed.reasoning}"
             )
             return parsed
         except (json.JSONDecodeError, ValidationError) as exc:
             last_error = str(exc)
-            logger.warning("Router attempt %d failed: %s", attempt, last_error)
+            logger.warning(f"Router attempt {attempt} failed: {last_error}")
 
     raise RoutingError(
         f"Could not extract tool call after {settings.max_router_retries}"
