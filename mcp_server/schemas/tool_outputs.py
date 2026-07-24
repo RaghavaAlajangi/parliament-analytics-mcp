@@ -37,3 +37,110 @@ class NarrationResult(BaseModel):
     model_used: str
     validation_passed: bool
     wahlperiode: int
+
+
+class DrucksacheResult(BaseModel):
+    id: str
+    dokumentnummer: str | None
+    drucksachetyp: str | None
+    titel: str | None
+    datum: str | None
+    wahlperiode: int | None
+    herausgeber: str | None
+    autoren_anzahl: int
+
+
+class DrucksacheListResult(BaseModel):
+    query_titel: str | None
+    wahlperiode: int | None
+    results: list[DrucksacheResult]
+    total_found: int
+
+
+class VorgangResult(BaseModel):
+    id: str
+    titel: str
+    vorgangstyp: str | None
+    beratungsstand: str | None
+    wahlperiode: int | None
+    datum: str | None
+    initiative: list[str]
+    abstract: str | None
+    sachgebiet: list[str]
+
+
+class VorgangListResult(BaseModel):
+    query_titel: str | None
+    wahlperiode: int | None
+    results: list[VorgangResult]
+    total_found: int
+
+
+class PlenarprotokollResult(BaseModel):
+    id: str
+    dokumentnummer: str | None
+    titel: str | None
+    datum: str | None
+    wahlperiode: int | None
+    herausgeber: str | None
+    sitzungsbemerkung: str | None
+    vorgangsbezug_anzahl: int
+
+
+class PlenarprotokollListResult(BaseModel):
+    wahlperiode: int | None
+    datum_start: str | None
+    datum_end: str | None
+    results: list[PlenarprotokollResult]
+    total_found: int
+
+
+class AktivitaetResult(BaseModel):
+    id: str
+    aktivitaetsart: str | None
+    titel: str | None
+    datum: str | None
+    wahlperiode: int | None
+    dokumentart: str | None
+    person_id: str | None
+    abstract: str | None
+    vorgangsbezug_anzahl: int
+
+
+class AktivitaetListResult(BaseModel):
+    query_person: str | None
+    wahlperiode: int | None
+    results: list[AktivitaetResult]
+    total_found: int
+
+
+# --- Detail / full-text results ---
+
+
+class DrucksacheDetailResult(DrucksacheResult):
+    anlagen: str | None = None
+    pdf_hash: str | None = None
+    urheber: list[str] = []
+
+
+class DrucksacheTextResult(DrucksacheDetailResult):
+    text: str | None = None
+
+
+class VorgangDetailResult(VorgangResult):
+    deskriptoren: list[str] = []
+    zustimmungsbeduerftigkeit: list[str] = []
+    mitteilung: str | None = None
+    gesta: str | None = None
+
+
+class PlenarprotokollDetailResult(PlenarprotokollResult):
+    pdf_hash: str | None = None
+
+
+class PlenarprotokollTextResult(PlenarprotokollDetailResult):
+    text: str | None = None
+
+
+class AktivitaetDetailResult(AktivitaetResult):
+    pass
