@@ -17,6 +17,7 @@ dependencies = [
     "python-json-logger>=2.0.7",
     "groq>=0.9.0",
     "anthropic>=0.28.0",
+    "openai>=2.48.0",
 ]
 
 [project.optional-dependencies]

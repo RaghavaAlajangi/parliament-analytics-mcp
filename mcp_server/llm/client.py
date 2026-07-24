@@ -1,4 +1,4 @@
-"""Thin LLM client wrapper supporting Groq and Anthropic providers."""
+"""Thin LLM client wrapper supporting Groq, Anthropic, and OpenAI providers."""
 
 import logging
 
@@ -30,6 +30,8 @@ async def complete(
         return await _complete_groq(prompt, system, settings)
     if settings.llm_provider == "anthropic":
         return await _complete_anthropic(prompt, system, settings)
+    if settings.llm_provider == "openai":
+        return await _complete_openai(prompt, system, settings)
     raise ValueError(f"Unknown LLM provider: {settings.llm_provider}")
 
 
@@ -54,6 +56,35 @@ async def _complete_groq(
     text = response.choices[0].message.content or ""
     logger.info(
         f"LLM call provider=groq model={settings.llm_model} "
+        f"prompt_tokens={response.usage.prompt_tokens} "
+        f"completion_tokens={response.usage.completion_tokens}"
+    )
+    return text, settings.llm_model
+
+
+async def _complete_openai(
+    prompt: str, system: str, settings: Settings
+) -> tuple[str, str]:
+    from openai import AsyncOpenAI
+
+    if not settings.openai_api_key:
+        raise ValueError(
+            "OPENAI_API_KEY is required when LLM_PROVIDER=openai"
+        )
+
+    client = AsyncOpenAI(api_key=settings.openai_api_key)
+    response = await client.chat.completions.create(
+        model=settings.llm_model,
+        messages=[
+            {"role": "system", "content": system},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=settings.llm_temperature,
+        max_tokens=settings.llm_max_tokens,
+    )
+    text = response.choices[0].message.content or ""
+    logger.info(
+        f"LLM call provider=openai model={settings.llm_model} "
         f"prompt_tokens={response.usage.prompt_tokens} "
         f"completion_tokens={response.usage.completion_tokens}"
     )
