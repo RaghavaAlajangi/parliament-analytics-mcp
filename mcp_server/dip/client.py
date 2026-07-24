@@ -3,7 +3,6 @@ limiting."""
 
 import asyncio
 import logging
-import sys
 from collections.abc import AsyncIterator
 from typing import Any
 
@@ -121,9 +120,7 @@ class DIPClient:
             if cursor:
                 params["cursor"] = cursor
 
-            raw = await asyncio.wait_for(
-                self._get("/person", params), timeout=15.0
-            )
+            raw = await self._get("/person", params)
             resp = DIPListResponse.model_validate(raw)
 
             for doc in resp.documents:
@@ -135,10 +132,10 @@ class DIPClient:
                         f"Could not parse person document: {doc.get('id')}"
                     )
 
-            print(
-                f"  [dip {total_yielded}/{resp.numFound} records]",
-                file=sys.stderr,
-                flush=True,
+            logger.info(
+                "DIP pagination progress: %d/%d records",
+                total_yielded,
+                resp.numFound,
             )
 
             if total_yielded >= self._max_records:
