@@ -11,7 +11,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from mcp_server.config import Settings
 from mcp_server.dip.models import (
     DIPListResponse,
-    Fraktion,
     Person,
     PersonDetail,
 )
@@ -100,14 +99,3 @@ class DIPClient:
         raw = await self._get(f"/person/{person_id}", {"format": "json"})
         return PersonDetail.model_validate(raw)
 
-    async def get_fraktionen(
-        self, wahlperiode: int | None = None
-    ) -> list[Fraktion]:
-        """Fetch all Fraktionen, optionally filtered by wahlperiode."""
-        params: dict[str, Any] = {"format": "json", "rows": 50}
-        if wahlperiode is not None:
-            params["f.wahlperiode"] = wahlperiode
-
-        raw = await self._get("/fraktion", params)
-        resp = DIPListResponse.model_validate(raw)
-        return [Fraktion.model_validate(doc) for doc in resp.documents]

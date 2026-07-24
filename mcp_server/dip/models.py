@@ -43,14 +43,6 @@ class PersonDetail(Person):
     roles: list[PersonRole] = Field(default_factory=list)
 
 
-class Fraktion(BaseModel):
-    """A parliamentary group (Fraktion) from GET /fraktion."""
-
-    id: str
-    bezeichnung: str
-    wahlperiode_nummer: list[int] = Field(default_factory=list)
-
-
 class DIPListResponse(BaseModel):
     """Generic paginated list response wrapper from the DIP API."""
 
