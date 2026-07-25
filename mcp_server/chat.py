@@ -132,7 +132,8 @@ async def chat_loop() -> None:
                         tool_name = tc["function"]["name"]
                         tool_args = json.loads(tc["function"]["arguments"])
 
-                        print(f"  [calling tool: {tool_name}({tool_args})]")
+                        print(f"  ----------- {tool_name} -----------")
+                        print(f"  [calling: {tool_args}]")
 
                         t0 = time.perf_counter()
                         try:
@@ -141,11 +142,11 @@ async def chat_loop() -> None:
                                 timeout=settings.tool_timeout,
                             )
                         except TimeoutError:
-                            tool_ms = (time.perf_counter() - t0) * 1000
+                            total_ms = (time.perf_counter() - t0) * 1000
                             print(
-                                f"  [tool timeout: {tool_name} "
-                                f"after {tool_ms:.0f}ms]"
+                                f"  [timeout after {total_ms:.0f}ms]"
                             )
+                            print("  ------------------------------------")
                             messages.append(
                                 {
                                     "role": "tool",
@@ -159,14 +160,17 @@ async def chat_loop() -> None:
                                 }
                             )
                             continue
-                        tool_ms = (time.perf_counter() - t0) * 1000
+                        total_ms = (time.perf_counter() - t0) * 1000
                         result_text = (
                             result.content[0].text if result.content else "{}"
                         )
                         if result.isError:
-                            print(f"  [tool error: {result_text}]")
+                            print(f"  [error: {result_text}]")
                         else:
-                            print(f"  [tool ok: {tool_name} {tool_ms:.0f}ms]")
+                            print(
+                                f"  [ok: total={total_ms:.0f}ms]"
+                            )
+                        print("  ------------------------------------")
 
                         messages.append(
                             {
