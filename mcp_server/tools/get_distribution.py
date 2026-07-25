@@ -1,6 +1,7 @@
 """MCP tool: calculate Fraktion distribution for a Wahlperiode."""
 
 import logging
+import sys
 from typing import Annotated
 
 from pydantic import Field
@@ -50,8 +51,14 @@ async def get_fraktion_distribution(
     excluded = len(persons) - len(in_period)
 
     logger.info(
-        f"get_fraktion_distribution wahlperiode={wahlperiode} "
-        f"fetched={len(persons)} in_period={len(in_period)}"
+        "get_fraktion_distribution wahlperiode=%d fetched=%d in_period=%d "
+        "api=%.0fms delay=%.0fms",
+        wahlperiode, len(persons), len(in_period),
+        client.api_ms, client.delay_ms,
+    )
+    print(
+        f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",
+        file=sys.stderr,
     )
 
     result = compute_distribution(in_period, wahlperiode)
