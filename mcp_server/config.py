@@ -10,15 +10,7 @@ class Settings(BaseSettings):
     # DIP API
     dip_api_key: str
     dip_base_url: str = "https://search.dip.bundestag.de/api/v1"
-    dip_max_concurrent: int = 3
-    dip_page_delay: float = 0.0  # seconds between paginated requests
-    # Runaway guard only — must exceed the size of one Wahlperiode
-    # (~1000-2000 person records) or distributions are computed on a
-    # biased sample
     dip_max_records: int = 5000
-    dip_retry_attempts: int = 4
-    dip_retry_min_wait: float = 1.0  # seconds, exponential backoff floor
-    dip_retry_max_wait: float = 30.0  # seconds, backoff/Retry-After ceiling
     dip_cache_ttl: float = 0.0  # seconds; 0 disables response caching
     dip_cache_dir: str = ".dip_cache"
     tool_timeout: float = 60.0  # seconds before a tool call is aborted

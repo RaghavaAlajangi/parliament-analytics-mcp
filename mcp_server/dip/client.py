@@ -1,5 +1,4 @@
-"""Async DIP Bundestag API client with pagination, retries, and rate
-limiting."""
+"""Async DIP Bundestag API client with pagination, retries, and caching."""
 
 import asyncio
 import logging
@@ -17,34 +16,31 @@ from tenacity import (
 
 from mcp_server.config import Settings
 from mcp_server.dip.cache import ResponseCache
-from mcp_server.dip.models import (
-    DIPListResponse,
-    Person,
-    PersonDetail,
-)
+from mcp_server.dip.models import DIPListResponse, Person, PersonDetail
 
 logger = logging.getLogger(__name__)
 
 _REDIRECT_CODES = (301, 302, 303, 307, 308)
+_RETRY_ATTEMPTS = 4
+_RETRY_MIN_WAIT = 1.0  # seconds
+_RETRY_MAX_WAIT = 30.0  # seconds
+_PAGE_DELAY = 1.0  # seconds between paginated requests
+_MAX_CONCURRENT = 1
 
 
 class DIPUnavailableError(Exception):
     """DIP is temporarily refusing requests (rate limit or bot protection).
 
-    The DIP API sits behind a bot-protection layer (Enodia) that answers
-    throttled or suspicious clients with a redirect to a JavaScript
-    challenge instead of a 429. Both cases are transient and retryable.
+    The DIP API sits behind Enodia bot-protection that answers throttled
+    clients with a redirect instead of a 429. Both are transient and retryable.
     """
 
-    def __init__(
-        self, message: str, retry_after: float | None = None
-    ) -> None:
+    def __init__(self, message: str, retry_after: float | None = None) -> None:
         super().__init__(message)
         self.retry_after = retry_after
 
 
 def _is_retryable(exc: BaseException) -> bool:
-    """Retry on throttling, transient network errors, and 5xx responses."""
     if isinstance(exc, (DIPUnavailableError, httpx.TransportError)):
         return True
     return (
@@ -53,25 +49,13 @@ def _is_retryable(exc: BaseException) -> bool:
     )
 
 
-def _make_wait(settings: Settings):
-    """Wait strategy: honour Retry-After when sent, else back off
-    exponentially."""
-    exponential = wait_exponential(
-        multiplier=1,
-        min=settings.dip_retry_min_wait,
-        max=settings.dip_retry_max_wait,
-    )
-
-    def _wait(retry_state) -> float:
-        exc = retry_state.outcome.exception() if retry_state.outcome else None
-        if (
-            isinstance(exc, DIPUnavailableError)
-            and exc.retry_after is not None
-        ):
-            return min(exc.retry_after, settings.dip_retry_max_wait)
-        return exponential(retry_state)
-
-    return _wait
+def _wait(retry_state) -> float:
+    exc = retry_state.outcome.exception() if retry_state.outcome else None
+    if isinstance(exc, DIPUnavailableError) and exc.retry_after is not None:
+        return min(exc.retry_after, _RETRY_MAX_WAIT)
+    return wait_exponential(
+        multiplier=1, min=_RETRY_MIN_WAIT, max=_RETRY_MAX_WAIT
+    )(retry_state)
 
 
 class DIPClient:
@@ -80,27 +64,16 @@ class DIPClient:
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.dip_base_url.rstrip("/")
         self._api_key = settings.dip_api_key
-        self._page_delay = settings.dip_page_delay
         self._max_records = settings.dip_max_records
-        self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
+        self._semaphore = asyncio.Semaphore(_MAX_CONCURRENT)
         self._client: httpx.AsyncClient | None = None
         self._cache: ResponseCache | None = (
             ResponseCache(Path(settings.dip_cache_dir), settings.dip_cache_ttl)
             if settings.dip_cache_ttl > 0
             else None
         )
-        # Retry settings come from config, so tests and deployments can
-        # tune backoff without touching code
-        self._get = retry(
-            stop=stop_after_attempt(settings.dip_retry_attempts),
-            wait=_make_wait(settings),
-            retry=retry_if_exception(_is_retryable),
-            reraise=True,
-        )(self._request)
 
     async def __aenter__(self) -> "DIPClient":
-        # API key travels in the Authorization header, never in the URL,
-        # so it cannot leak into server logs or proxies
         self._client = httpx.AsyncClient(
             timeout=30.0,
             headers={"Authorization": f"ApiKey {self._api_key}"},
@@ -111,7 +84,13 @@ class DIPClient:
         if self._client:
             await self._client.aclose()
 
-    async def _request(
+    @retry(
+        stop=stop_after_attempt(_RETRY_ATTEMPTS),
+        wait=_wait,
+        retry=retry_if_exception(_is_retryable),
+        reraise=True,
+    )
+    async def _get(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
         assert self._client is not None, (
@@ -127,32 +106,24 @@ class DIPClient:
             response.status_code == 429
             or response.status_code in _REDIRECT_CODES
         ):
-            retry_after_header = response.headers.get("retry-after")
             try:
-                retry_after = float(retry_after_header)
+                retry_after = float(response.headers.get("retry-after"))
             except (TypeError, ValueError):
                 retry_after = None
             reason = (
                 "rate limited (HTTP 429)"
                 if response.status_code == 429
-                else "redirected to the bot-protection challenge "
-                f"(HTTP {response.status_code})"
+                else f"redirected to bot-protection challenge (HTTP {response.status_code})"
             )
             logger.warning("DIP API %s on GET %s, backing off", reason, path)
             raise DIPUnavailableError(
-                f"DIP API {reason}. The service throttles automated "
-                "clients. If this persists: wait a few minutes, verify "
-                "the API key is current (the public key rotates yearly), "
-                "or request a personal key from "
-                "parlamentsdokumentation@bundestag.de.",
+                f"DIP API {reason}. Wait a few minutes or verify your API key.",
                 retry_after=retry_after,
             )
+
         if not response.is_success:
             logger.error(
-                "DIP API error: GET %s -> HTTP %d: %s",
-                path,
-                response.status_code,
-                response.text[:200],
+                "DIP API error: GET %s -> HTTP %d", path, response.status_code
             )
         response.raise_for_status()
         return response.json()
@@ -160,7 +131,6 @@ class DIPClient:
     async def _get_cached(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
-        """Serve from the TTL cache when enabled, else fetch and store."""
         if self._cache is not None:
             cached = self._cache.get(path, params)
             if cached is not None:
@@ -176,22 +146,7 @@ class DIPClient:
         wahlperiode: int | None = None,
         search: str | None = None,
     ) -> AsyncIterator[Person]:
-        """Paginate all persons, optionally filtered by wahlperiode or search.
-
-        Parameters
-        ----------
-        wahlperiode : int or None, optional
-            Filter results to this Wahlperiode number.
-        search : str or None, optional
-            Free-text search term matched against person names.
-
-        Yields
-        ------
-        Person
-            Validated Person records from the DIP API.
-        """
-        # The API paginates with a cursor at a fixed page size; there is
-        # no documented page-size parameter
+        """Paginate all persons, optionally filtered by wahlperiode or search."""
         params: dict[str, Any] = {"format": "json"}
         if wahlperiode is not None:
             params["f.wahlperiode"] = wahlperiode
@@ -214,41 +169,27 @@ class DIPClient:
                     total_yielded += 1
                 except Exception:
                     logger.warning(
-                        f"Could not parse person document: {doc.get('id')}"
+                        "Could not parse person document: %s", doc.get("id")
                     )
 
             logger.info(
-                "DIP pagination progress: %d/%d records",
-                total_yielded,
-                resp.numFound,
+                "DIP pagination: %d/%d records", total_yielded, resp.numFound
             )
 
             if total_yielded >= self._max_records:
                 logger.warning(
-                    "DIP max_records cap (%d) reached, stopping pagination",
-                    self._max_records,
+                    "DIP max_records cap (%d) reached", self._max_records
                 )
                 break
 
             cursor = resp.cursor
-            if cursor and self._page_delay > 0:
-                await asyncio.sleep(self._page_delay)
-            if not cursor:
+            if cursor:
+                await asyncio.sleep(_PAGE_DELAY)
+            else:
                 break
 
     async def get_person(self, person_id: str) -> PersonDetail:
-        """Fetch a single politician by ID.
-
-        Parameters
-        ----------
-        person_id : str
-            DIP person identifier.
-
-        Returns
-        -------
-        PersonDetail
-            Full politician record including roles.
-        """
+        """Fetch a single politician by ID."""
         raw = await self._get_cached(
             f"/person/{person_id}", {"format": "json"}
         )
