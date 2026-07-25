@@ -41,6 +41,19 @@ class FraktionDistribution(BaseModel):
     data_quality_notes: list[str] = Field(default_factory=list)
 
 
+class MemberEntry(BaseModel):
+    full_name: str
+    fraktion: str | None = None
+    wahlperiode: list[int] = Field(default_factory=list)
+
+
+class MemberListResult(BaseModel):
+    wahlperiode: int
+    fraktion_filter: str | None = None
+    results: list[MemberEntry]
+    total_found: int
+
+
 class NarrationResult(BaseModel):
     text: str
     model_used: str

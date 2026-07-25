@@ -6,6 +6,7 @@ from fastmcp import FastMCP
 
 from mcp_server.config import load_settings_or_exit
 from mcp_server.tools.get_distribution import get_fraktion_distribution
+from mcp_server.tools.get_members import get_members
 from mcp_server.tools.get_politician import get_politician
 from mcp_server.tools.narrate import narrate_distribution
 
@@ -22,6 +23,7 @@ mcp = FastMCP(
 )
 
 mcp.tool()(get_politician)
+mcp.tool()(get_members)
 mcp.tool()(get_fraktion_distribution)
 mcp.tool()(narrate_distribution)
 
