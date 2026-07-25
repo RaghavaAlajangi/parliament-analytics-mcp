@@ -120,21 +120,15 @@ class TestDIPClientResilience:
     async def test_bot_challenge_redirect_raises_after_retries(
         self, httpx_mock
     ) -> None:
-        settings = Settings(
-            dip_api_key="BTK2024",
-            groq_api_key="test",
-            dip_retry_attempts=2,
-            dip_retry_min_wait=0.01,
-            dip_retry_max_wait=0.02,
-        )
-        for _ in range(2):
+        # Queue enough 303s to exhaust all retry attempts (_RETRY_ATTEMPTS = 4)
+        for _ in range(4):
             httpx_mock.add_response(
                 status_code=303,
                 headers={"location": "/.enodia/challenge"},
             )
 
         with pytest.raises(DIPUnavailableError):
-            async with DIPClient(settings) as client:
+            async with DIPClient(_mock_settings()) as client:
                 [p async for p in client.get_persons(wahlperiode=20)]
 
 
