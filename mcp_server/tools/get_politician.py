@@ -23,7 +23,7 @@ async def get_politician(
     name: Annotated[
         str,
         Field(
-            min_length=2,
+            min_length=1,
             description="Full or partial name, e.g. 'Friedrich Merz'",
         ),
     ],
