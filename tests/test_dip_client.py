@@ -107,31 +107,19 @@ class TestDIPClientResilience:
         assert "apikey" not in str(request.url)
 
     @pytest.mark.asyncio
-    async def test_429_is_retried_until_success(self, httpx_mock) -> None:
-        httpx_mock.add_response(status_code=429, headers={"Retry-After": "0"})
-        httpx_mock.add_response(
-            json={
-                "cursor": None,
-                "numFound": 1,
-                "documents": [_person_doc("p1")],
-            }
-        )
+    async def test_rate_limit_raises(self, httpx_mock) -> None:
+        httpx_mock.add_response(status_code=429)
 
-        async with DIPClient(_mock_settings()) as client:
-            persons = [p async for p in client.get_persons(wahlperiode=20)]
-
-        assert len(persons) == 1
+        with pytest.raises(DIPUnavailableError):
+            async with DIPClient(_mock_settings()) as client:
+                [p async for p in client.get_persons(wahlperiode=20)]
 
     @pytest.mark.asyncio
-    async def test_bot_challenge_redirect_raises_after_retries(
-        self, httpx_mock
-    ) -> None:
-        # Queue enough 303s to exhaust all retry attempts (_RETRY_ATTEMPTS = 4)
-        for _ in range(4):
-            httpx_mock.add_response(
-                status_code=303,
-                headers={"location": "/.enodia/challenge"},
-            )
+    async def test_bot_challenge_redirect_raises(self, httpx_mock) -> None:
+        httpx_mock.add_response(
+            status_code=303,
+            headers={"location": "/.enodia/challenge"},
+        )
 
         with pytest.raises(DIPUnavailableError):
             async with DIPClient(_mock_settings()) as client:

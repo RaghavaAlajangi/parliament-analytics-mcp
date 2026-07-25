@@ -1,4 +1,4 @@
-"""Async DIP Bundestag API client with pagination, retries, and caching."""
+"""Async DIP Bundestag API client with pagination and caching."""
 
 import asyncio
 import logging
@@ -8,12 +8,6 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from tenacity import (
-    retry,
-    retry_if_exception,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from mcp_server.config import Settings
 from mcp_server.dip.cache import ResponseCache
@@ -22,49 +16,12 @@ from mcp_server.dip.models import DIPListResponse, Person, PersonDetail
 logger = logging.getLogger(__name__)
 
 _REDIRECT_CODES = (301, 302, 303, 307, 308)
-_RETRY_ATTEMPTS = 4
-_RETRY_MIN_WAIT = 1.0  # seconds
-_RETRY_MAX_WAIT = 30.0  # seconds
 _PAGE_DELAY = 0.5  # seconds between paginated requests
 _MAX_CONCURRENT = 1
 
 
 class DIPUnavailableError(Exception):
-    """DIP is temporarily refusing requests (rate limit or bot protection).
-
-    The DIP API sits behind Enodia bot-protection that answers throttled
-    clients with a redirect instead of a 429. Both are transient and retryable.
-    """
-
-    def __init__(self, message: str, retry_after: float | None = None) -> None:
-        super().__init__(message)
-        self.retry_after = retry_after
-
-
-def _is_retryable(exc: BaseException) -> bool:
-    if isinstance(exc, (DIPUnavailableError, httpx.TransportError)):
-        return True
-    return (
-        isinstance(exc, httpx.HTTPStatusError)
-        and exc.response.status_code >= 500
-    )
-
-
-def _make_wait():
-    exponential = wait_exponential(
-        multiplier=1, min=_RETRY_MIN_WAIT, max=_RETRY_MAX_WAIT
-    )
-
-    def _wait(retry_state) -> float:
-        exc = retry_state.outcome.exception() if retry_state.outcome else None
-        if (
-            isinstance(exc, DIPUnavailableError)
-            and exc.retry_after is not None
-        ):
-            return min(exc.retry_after, _RETRY_MAX_WAIT)
-        return exponential(retry_state)
-
-    return _wait
+    """DIP is temporarily refusing requests (rate limit or bot protection)."""
 
 
 class DIPClient:
@@ -84,13 +41,6 @@ class DIPClient:
             if settings.dip_cache_ttl > 0
             else None
         )
-        # Wire retry at instance level so tests can patch self._get directly
-        self._get = retry(
-            stop=stop_after_attempt(_RETRY_ATTEMPTS),
-            wait=_make_wait(),
-            retry=retry_if_exception(_is_retryable),
-            reraise=True,
-        )(self._request)
 
     async def __aenter__(self) -> "DIPClient":
         self._client = httpx.AsyncClient(
@@ -103,7 +53,7 @@ class DIPClient:
         if self._client:
             await self._client.aclose()
 
-    async def _request(
+    async def _get(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
         assert self._client is not None, (
@@ -121,20 +71,14 @@ class DIPClient:
             response.status_code == 429
             or response.status_code in _REDIRECT_CODES
         ):
-            try:
-                retry_after = float(response.headers.get("retry-after"))
-            except (TypeError, ValueError):
-                retry_after = None
             reason = (
                 "rate limited (HTTP 429)"
                 if response.status_code == 429
-                else f"redirected to bot-protection challenge "
-                f"(HTTP {response.status_code})"
+                else f"bot-protection challenge (HTTP {response.status_code})"
             )
-            logger.warning("DIP API %s on GET %s, backing off", reason, path)
+            logger.warning("DIP API %s on GET %s", reason, path)
             raise DIPUnavailableError(
-                f"DIP API {reason}. Wait a few minutes/verify your API key.",
-                retry_after=retry_after,
+                f"DIP API {reason}. Wait a few minutes or verify your API key."
             )
 
         if not response.is_success:
@@ -199,15 +143,12 @@ class DIPClient:
                 )
                 continue  # try next candidate
 
-            # Yield from the first (already-fetched) page, then paginate
             cursor: str | None = None
             total_yielded = 0
             resp = first_resp
-            raw = first_page
             break
         else:
-            # All candidates returned zero results
-            return
+            return  # all candidates returned zero results
 
         while True:
             if cursor:
