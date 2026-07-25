@@ -24,7 +24,7 @@ _REDIRECT_CODES = (301, 302, 303, 307, 308)
 _RETRY_ATTEMPTS = 4
 _RETRY_MIN_WAIT = 1.0  # seconds
 _RETRY_MAX_WAIT = 30.0  # seconds
-_PAGE_DELAY = 1.0  # seconds between paginated requests
+_PAGE_DELAY = 0.5  # seconds between paginated requests
 _MAX_CONCURRENT = 1
 
 
@@ -113,11 +113,12 @@ class DIPClient:
             reason = (
                 "rate limited (HTTP 429)"
                 if response.status_code == 429
-                else f"redirected to bot-protection challenge (HTTP {response.status_code})"
+                else f"redirected to bot-protection challenge "
+                f"(HTTP {response.status_code})"
             )
             logger.warning("DIP API %s on GET %s, backing off", reason, path)
             raise DIPUnavailableError(
-                f"DIP API {reason}. Wait a few minutes or verify your API key.",
+                f"DIP API {reason}. Wait a few minutes/verify your API key.",
                 retry_after=retry_after,
             )
 
@@ -146,7 +147,8 @@ class DIPClient:
         wahlperiode: int | None = None,
         search: str | None = None,
     ) -> AsyncIterator[Person]:
-        """Paginate all persons, optionally filtered by wahlperiode or search."""
+        """Paginate all persons, optionally filtered by wahlperiode or
+        search."""
         params: dict[str, Any] = {"format": "json"}
         if wahlperiode is not None:
             params["f.wahlperiode"] = wahlperiode
@@ -183,10 +185,9 @@ class DIPClient:
                 break
 
             cursor = resp.cursor
-            if cursor:
-                await asyncio.sleep(_PAGE_DELAY)
-            else:
+            if not cursor or total_yielded >= resp.numFound:
                 break
+            await asyncio.sleep(_PAGE_DELAY)
 
     async def get_person(self, person_id: str) -> PersonDetail:
         """Fetch a single politician by ID."""
