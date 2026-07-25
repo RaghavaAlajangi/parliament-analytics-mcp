@@ -15,6 +15,7 @@ class TestMCPServer:
             tools = await client.list_tools()
         assert {t.name for t in tools} == {
             "get_politician",
+            "get_members",
             "get_fraktion_distribution",
             "narrate_distribution",
         }
@@ -23,8 +24,6 @@ class TestMCPServer:
     async def test_invalid_wahlperiode_rejected_before_execution(
         self,
     ) -> None:
-        # ge=1 on the tool signature must be enforced at the MCP layer —
-        # no API call is made for an invalid argument
         async with Client(mcp) as client:
             with pytest.raises(ToolError):
                 await client.call_tool(
@@ -32,7 +31,7 @@ class TestMCPServer:
                 )
 
     @pytest.mark.asyncio
-    async def test_too_short_name_rejected(self) -> None:
+    async def test_empty_name_rejected(self) -> None:
         async with Client(mcp) as client:
             with pytest.raises(ToolError):
-                await client.call_tool("get_politician", {"name": "M"})
+                await client.call_tool("get_politician", {"name": ""})

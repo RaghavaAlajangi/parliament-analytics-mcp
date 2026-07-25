@@ -18,6 +18,8 @@ class _FakeDIPClient:
 
     def __init__(self, persons: list[Person]) -> None:
         self._persons = persons
+        self.api_ms: float = 0.0
+        self.delay_ms: float = 0.0
 
     async def __aenter__(self) -> "_FakeDIPClient":
         return self

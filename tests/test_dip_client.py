@@ -8,8 +8,13 @@ from mcp_server.config import Settings
 from mcp_server.dip.client import DIPClient, DIPUnavailableError
 
 
-def _mock_settings() -> Settings:
-    return Settings(dip_api_key="BTK2024", groq_api_key="test")
+def _mock_settings(**overrides) -> Settings:
+    defaults = {
+        "dip_api_key": "BTK2024",
+        "groq_api_key": "test",
+        "dip_cache_ttl": 0,
+    }
+    return Settings(**{**defaults, **overrides})
 
 
 def _person_doc(person_id: str, fraktion: str | None = "CDU") -> dict:
@@ -33,7 +38,7 @@ class TestDIPClientPagination:
 
         async with DIPClient(_mock_settings()) as client:
             with patch.object(
-                client, "_get", new=AsyncMock(return_value=response)
+                client, "_get_cached", new=AsyncMock(return_value=response)
             ):
                 persons = [p async for p in client.get_persons(wahlperiode=20)]
 
@@ -55,7 +60,9 @@ class TestDIPClientPagination:
 
         async with DIPClient(_mock_settings()) as client:
             with patch.object(
-                client, "_get", new=AsyncMock(side_effect=[page1, page2])
+                client,
+                "_get_cached",
+                new=AsyncMock(side_effect=[page1, page2]),
             ):
                 persons = [p async for p in client.get_persons(wahlperiode=20)]
 
@@ -75,11 +82,12 @@ class TestDIPClientPagination:
 
         async with DIPClient(_mock_settings()) as client:
             with patch.object(
-                client, "_get", new=AsyncMock(return_value=response)
+                client, "_get_cached", new=AsyncMock(return_value=response)
             ):
                 persons = [p async for p in client.get_persons(wahlperiode=20)]
 
-        # Only the valid document is yielded; malformed one is skipped with a warning
+        # Only the valid document is yielded; malformed one is skipped with a
+        # warning
         assert len(persons) == 1
 
 
@@ -100,9 +108,7 @@ class TestDIPClientResilience:
 
     @pytest.mark.asyncio
     async def test_429_is_retried_until_success(self, httpx_mock) -> None:
-        httpx_mock.add_response(
-            status_code=429, headers={"Retry-After": "0"}
-        )
+        httpx_mock.add_response(status_code=429, headers={"Retry-After": "0"})
         httpx_mock.add_response(
             json={
                 "cursor": None,
@@ -137,11 +143,8 @@ class TestDIPClientCache:
     async def test_second_call_served_from_cache(
         self, httpx_mock, tmp_path
     ) -> None:
-        settings = Settings(
-            dip_api_key="BTK2024",
-            groq_api_key="test",
-            dip_cache_ttl=60.0,
-            dip_cache_dir=str(tmp_path),
+        settings = _mock_settings(
+            dip_cache_ttl=60.0, dip_cache_dir=str(tmp_path)
         )
         # Only ONE HTTP response is queued; the second identical query
         # must be answered from the cache or the mock would fail.
@@ -161,14 +164,9 @@ class TestDIPClientCache:
         assert [p.id for p in first] == [p.id for p in second] == ["p1"]
 
     @pytest.mark.asyncio
-    async def test_expired_entry_refetches(
-        self, httpx_mock, tmp_path
-    ) -> None:
-        settings = Settings(
-            dip_api_key="BTK2024",
-            groq_api_key="test",
-            dip_cache_ttl=0.000001,
-            dip_cache_dir=str(tmp_path),
+    async def test_expired_entry_refetches(self, httpx_mock, tmp_path) -> None:
+        settings = _mock_settings(
+            dip_cache_ttl=0.000001, dip_cache_dir=str(tmp_path)
         )
         for _ in range(2):
             httpx_mock.add_response(
