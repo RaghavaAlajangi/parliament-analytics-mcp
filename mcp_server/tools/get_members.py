@@ -55,7 +55,8 @@ async def get_members(
     async with DIPClient(settings) as client:
         async for person in client.get_persons(wahlperiode=wahlperiode):
             if fraktion_lower and (
-                person.fraktion is None or fraktion_lower not in person.fraktion.lower()
+                person.fraktion is None
+                or fraktion_lower not in person.fraktion.lower()
             ):
                 continue
             results.append(
@@ -69,7 +70,8 @@ async def get_members(
                 break
 
     logger.info(
-        "get_members wahlperiode=%d fraktion=%r found=%d " "api=%.0fms delay=%.0fms",
+        "get_members wahlperiode=%d fraktion=%r"
+        " found=%d api=%.0fms delay=%.0fms",
         wahlperiode,
         fraktion,
         len(results),
