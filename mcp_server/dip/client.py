@@ -121,7 +121,8 @@ class DIPClient:
         wahlperiode: int | None = None,
         search: str | None = None,
     ) -> AsyncIterator[Person]:
-        """Paginate all persons, optionally filtered by wahlperiode or search."""
+        """Paginate all persons, optionally filtered by wahlperiode or
+        search."""
         base_params: dict[str, Any] = {"format": "json"}
         if wahlperiode is not None:
             base_params["f.wahlperiode"] = wahlperiode

@@ -52,10 +52,3 @@ class MemberListResult(BaseModel):
     fraktion_filter: str | None = None
     results: list[MemberEntry]
     total_found: int
-
-
-class NarrationResult(BaseModel):
-    text: str
-    model_used: str
-    validation_passed: bool
-    wahlperiode: int

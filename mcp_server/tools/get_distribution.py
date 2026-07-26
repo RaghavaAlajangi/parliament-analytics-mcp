@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def get_fraktion_distribution(
     wahlperiode: Annotated[
         int,
-        Field(ge=1, description="Wahlperiode number, e.g. 20"),
+        Field(ge=1, description="Wahlperiode number, e.g. 21"),
     ],
 ) -> FraktionDistribution:
     """Calculate the percentage share of each Fraktion in a given Wahlperiode.
@@ -28,7 +28,7 @@ async def get_fraktion_distribution(
     Parameters
     ----------
     wahlperiode : int
-        Wahlperiode number, e.g. 20 for the 20th Bundestag.
+        Wahlperiode number, e.g. 21 for the current (21st) Bundestag.
 
     Returns
     -------
@@ -45,16 +45,17 @@ async def get_fraktion_distribution(
     # The f.wahlperiode filter is sent to the API, but its effect on the
     # /person list is not guaranteed — filter client-side as well so the
     # distribution never counts records from other legislative periods.
-    in_period = [
-        p for p in persons if wahlperiode in p.wahlperiode_nummer
-    ]
+    in_period = [p for p in persons if wahlperiode in p.wahlperiode_nummer]
     excluded = len(persons) - len(in_period)
 
     logger.info(
         "get_fraktion_distribution wahlperiode=%d fetched=%d in_period=%d "
         "api=%.0fms delay=%.0fms",
-        wahlperiode, len(persons), len(in_period),
-        client.api_ms, client.delay_ms,
+        wahlperiode,
+        len(persons),
+        len(in_period),
+        client.api_ms,
+        client.delay_ms,
     )
     print(
         f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",

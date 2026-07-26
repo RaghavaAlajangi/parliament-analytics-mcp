@@ -18,7 +18,7 @@ MAX_MEMBERS = 20
 async def get_members(
     wahlperiode: Annotated[
         int,
-        Field(ge=1, description="Wahlperiode number, e.g. 20"),
+        Field(ge=1, description="Wahlperiode number, e.g. 21"),
     ],
     fraktion: Annotated[
         str | None,
@@ -41,7 +41,7 @@ async def get_members(
     Parameters
     ----------
     wahlperiode : int
-        Wahlperiode number, e.g. 19 for the 19th Bundestag.
+        Wahlperiode number, e.g. 21 for the current (21st) Bundestag.
     fraktion : str or None, optional
         Fraktion name to filter by, e.g. 'SPD', 'CDU/CSU', 'AfD'.
     limit : int, optional
@@ -72,7 +72,11 @@ async def get_members(
     logger.info(
         "get_members wahlperiode=%d fraktion=%r found=%d "
         "api=%.0fms delay=%.0fms",
-        wahlperiode, fraktion, len(results), client.api_ms, client.delay_ms,
+        wahlperiode,
+        fraktion,
+        len(results),
+        client.api_ms,
+        client.delay_ms,
     )
     print(
         f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",

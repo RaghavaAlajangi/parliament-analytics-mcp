@@ -30,7 +30,7 @@ async def get_politician(
     ],
     wahlperiode: Annotated[
         int | None,
-        Field(ge=1, description="Optional Wahlperiode filter, e.g. 20"),
+        Field(ge=1, description="Optional Wahlperiode filter, e.g. 21"),
     ] = None,
 ) -> PoliticianListResult:
     """Look up biographical and faction data for a named politician.
@@ -44,7 +44,7 @@ async def get_politician(
         Full or partial name, e.g. 'Friedrich Merz' or
         'Steinmeier Frank-Walter'.
     wahlperiode : int or None, optional
-        Optional Wahlperiode filter, e.g. 20.
+        Optional Wahlperiode filter, e.g. 21 for the current Bundestag.
 
     Returns
     -------
@@ -83,8 +83,11 @@ async def get_politician(
     logger.info(
         "get_politician query=%r wahlperiode=%s found=%d "
         "api=%.0fms delay=%.0fms",
-        name, wahlperiode, len(results),
-        client.api_ms, client.delay_ms,
+        name,
+        wahlperiode,
+        len(results),
+        client.api_ms,
+        client.delay_ms,
     )
     print(
         f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",

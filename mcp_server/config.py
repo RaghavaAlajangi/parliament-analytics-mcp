@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     dip_api_key: str
     dip_base_url: str = "https://search.dip.bundestag.de/api/v1"
     dip_max_records: int = 5000
-    dip_cache_ttl: float = 0.0  # seconds; 0 disables response caching
+    dip_cache_ttl: float = 86400.0  # seconds; 0 disables; default 24 h
     dip_cache_dir: str = ".dip_cache"
     tool_timeout: float = 60.0  # seconds before a tool call is aborted
 
@@ -22,9 +22,6 @@ class Settings(BaseSettings):
     llm_model: str = "llama-3.3-70b-versatile"
     llm_temperature: float = 0.2
     llm_max_tokens: int = 2048
-
-    # Routing
-    max_router_retries: int = 3
 
     # Observability
     log_level: str = "INFO"
