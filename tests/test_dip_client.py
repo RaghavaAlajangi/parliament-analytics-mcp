@@ -70,6 +70,36 @@ class TestDIPClientPagination:
         assert {p.id for p in persons} == {"p1", "p2"}
 
     @pytest.mark.asyncio
+    async def test_empty_page_stops_pagination(self) -> None:
+        """An empty documents list must terminate pagination.
+
+        Without the early-break guard, skipped malformed docs cause
+        total_yielded to drift below numFound, and the loop would fetch
+        an empty next page forever (or until the cursor is exhausted).
+        """
+        page1 = {
+            "cursor": "c2",
+            "numFound": 2,
+            "documents": [_person_doc("p1")],
+        }
+        page2 = {
+            "cursor": "c3",
+            "numFound": 2,
+            "documents": [],  # server returned an empty page — must stop here
+        }
+
+        async with DIPClient(_mock_settings()) as client:
+            with patch.object(
+                client,
+                "_get_cached",
+                new=AsyncMock(side_effect=[page1, page2]),
+            ):
+                persons = [p async for p in client.get_persons(wahlperiode=20)]
+
+        assert len(persons) == 1
+        assert persons[0].id == "p1"
+
+    @pytest.mark.asyncio
     async def test_malformed_document_is_skipped(self) -> None:
         response = {
             "cursor": None,
@@ -93,8 +123,12 @@ class TestDIPClientPagination:
 
 class TestDIPClientResilience:
     @pytest.mark.asyncio
-    async def test_api_key_sent_as_authorization_header(self, httpx_mock) -> None:
-        httpx_mock.add_response(json={"cursor": None, "numFound": 0, "documents": []})
+    async def test_api_key_sent_as_authorization_header(
+        self, httpx_mock
+    ) -> None:
+        httpx_mock.add_response(
+            json={"cursor": None, "numFound": 0, "documents": []}
+        )
         async with DIPClient(_mock_settings()) as client:
             [p async for p in client.get_persons(wahlperiode=20)]
 
@@ -124,8 +158,12 @@ class TestDIPClientResilience:
 
 class TestDIPClientCache:
     @pytest.mark.asyncio
-    async def test_second_call_served_from_cache(self, httpx_mock, tmp_path) -> None:
-        settings = _mock_settings(dip_cache_ttl=60.0, dip_cache_dir=str(tmp_path))
+    async def test_second_call_served_from_cache(
+        self, httpx_mock, tmp_path
+    ) -> None:
+        settings = _mock_settings(
+            dip_cache_ttl=60.0, dip_cache_dir=str(tmp_path)
+        )
         # Only ONE HTTP response is queued; the second identical query
         # must be answered from the cache or the mock would fail.
         httpx_mock.add_response(
@@ -145,7 +183,9 @@ class TestDIPClientCache:
 
     @pytest.mark.asyncio
     async def test_expired_entry_refetches(self, httpx_mock, tmp_path) -> None:
-        settings = _mock_settings(dip_cache_ttl=0.000001, dip_cache_dir=str(tmp_path))
+        settings = _mock_settings(
+            dip_cache_ttl=0.000001, dip_cache_dir=str(tmp_path)
+        )
         for _ in range(2):
             httpx_mock.add_response(
                 json={
