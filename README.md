@@ -109,7 +109,7 @@ Add to `claude_desktop_config.json`:
   - `get_fraktion_distribution` — compute percentage share per Fraktion for a given Wahlperiode
 - **Autonomous chat agent** (`parliament-chat`) — an LLM connects to the MCP server, picks tools from natural language input, and synthesises the answer
 - **Installable package** with a `parliament-chat` entry point; no manual server wiring needed
-- **Inline observability** — every tool call logs LLM token usage, latency, and DIP API/delay timing to the console (production systems would route this to Langfuse or OpenTelemetry)
+- **Inline observability** — the chat prints LLM token usage and per-tool latency inline; DIP API/delay timing is emitted via the `logging` module (production systems would route this to Langfuse or OpenTelemetry)
 - **On-disk response cache** — avoids re-hitting the DIP API for repeated queries within a 24 h window
 
 ## Design Decisions & Assumptions
@@ -119,6 +119,7 @@ Add to `claude_desktop_config.json`:
 - **Dual LLM provider support** — OpenAI and Groq are interchangeable via `LLM_PROVIDER` in `.env`; Groq is the default (free tier, fast inference).
 - **DIP API name order** — the `f.person` filter expects `Lastname Firstname`; the client automatically retries with tokens swapped so natural `Firstname Lastname` input works too.
 - **Client-side Wahlperiode filtering** — the `f.wahlperiode` API filter is not guaranteed exhaustive, so results are also filtered in-process to avoid counting records from other periods.
+- **"Fraktionslos" is expectedly large** — the DIP `/person` endpoint returns every person documented in parliamentary materials for a Wahlperiode, including non-MdB records (government members, Bundesrat participants). Records without a Fraktion are counted as `Fraktionslos` and flagged in `data_quality_notes` rather than silently dropped.
 - **Public API key** — the shared DIP key ships in `.env.example` and is valid until May 2027.
 
 ## Rate limiting
