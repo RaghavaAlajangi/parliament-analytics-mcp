@@ -27,8 +27,9 @@ dev = [
 ]
 
 [project.scripts]
-parliament-chat = "mcp_server.chat:main"
-parliament-mcp  = "mcp_server.server:main"
+parliament-chat     = "mcp_server.chat:main"
+parliament-mcp      = "mcp_server.server:main"
+parliament-mcp-http = "mcp_server.server:main_http"
 
 [tool.setuptools.packages.find]
 where = ["."]

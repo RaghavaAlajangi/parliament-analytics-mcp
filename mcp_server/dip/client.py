@@ -11,7 +11,7 @@ import httpx
 
 from mcp_server.config import Settings
 from mcp_server.dip.cache import ResponseCache
-from mcp_server.dip.models import DIPListResponse, Person, PersonDetail
+from mcp_server.dip.models import DIPListResponse, Person
 
 logger = logging.getLogger(__name__)
 
@@ -60,9 +60,10 @@ class DIPClient:
     async def _get(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
-        assert self._client is not None, (
-            "DIPClient must be used as async context manager"
-        )
+        if self._client is None:
+            raise RuntimeError(
+                "DIPClient must be used as async context manager"
+            )
         url = f"{self._base_url}{path}"
 
         async with self._semaphore:
@@ -206,10 +207,3 @@ class DIPClient:
                 t1 = time.perf_counter()
                 await asyncio.sleep(_PAGE_DELAY)
                 self.delay_ms += (time.perf_counter() - t1) * 1000
-
-    async def get_person(self, person_id: str) -> PersonDetail:
-        """Fetch a single politician by ID."""
-        raw = await self._get_cached(
-            f"/person/{person_id}", {"format": "json"}
-        )
-        return PersonDetail.model_validate(raw)

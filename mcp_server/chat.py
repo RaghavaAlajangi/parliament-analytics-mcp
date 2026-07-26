@@ -1,20 +1,17 @@
 """Mode — Autonomous MCP Agent.
 
-Connects to the MCP server via stdio transport and lets an MCP-compatible
-LLM pick tools autonomously. The LLM reads tool descriptions, selects
-the right tool, and formulates the answer — no routing code needed here.
+Connects to the MCP server via stdio or HTTP transport and lets an
+MCP-compatible LLM pick tools autonomously.
 
 Usage:
-    # Terminal 1: start the MCP server
-    python -m mcp_server.server
+    # Stdio (default) — chat.py spawns the server itself
+    parliament-chat
 
-    # Terminal 2: start the chat client
-    python -m mcp_server.chat
-
-The chat client uses the Groq (or OpenAI) API with native tool-calling,
-passing the MCP server's tool schemas directly to the LLM.
+    # HTTP — connect to a running server (e.g. Docker)
+    parliament-chat --url http://localhost:8000/mcp
 """
 
+import argparse
 import asyncio
 import json
 import logging
@@ -23,22 +20,34 @@ import time
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.client.streamable_http import streamable_http_client
 
-from mcp_server.config import get_settings, load_settings_or_exit
+from mcp_server.config import Settings, get_settings, load_settings_or_exit
 
 logger = logging.getLogger(__name__)
 
 
-async def chat_loop() -> None:
-    """Run an interactive chat loop backed by the MCP server."""
+async def chat_loop(server_url: str | None = None) -> None:
+    """Run an interactive chat loop backed by the MCP server.
+
+    Parameters
+    ----------
+    server_url : str | None
+        HTTP URL of a running server (e.g. http://localhost:8000/mcp). When
+        None, spawns the server locally via stdio.
+    """
     settings = get_settings()
 
-    server_params = StdioServerParameters(
-        command=sys.executable,
-        args=["-m", "mcp_server.server"],
-    )
+    if server_url:
+        transport_ctx = streamable_http_client(server_url)
+    else:
+        server_params = StdioServerParameters(
+            command=sys.executable,
+            args=["-m", "mcp_server.server"],
+        )
+        transport_ctx = stdio_client(server_params)
 
-    async with stdio_client(server_params) as (read, write):
+    async with transport_ctx as (read, write, *_):
         async with ClientSession(read, write) as session:
             await session.initialize()
 
@@ -181,7 +190,7 @@ async def chat_loop() -> None:
 async def _groq_chat(
     messages: list[dict],
     tools: list[dict],
-    settings,
+    settings: Settings,
 ) -> tuple[str, list[dict]]:
     from groq import AsyncGroq  # type: ignore[import-untyped]
 
@@ -220,7 +229,7 @@ async def _groq_chat(
 async def _openai_chat(
     messages: list[dict],
     tools: list[dict],
-    settings,
+    settings: Settings,
 ) -> tuple[str, list[dict]]:
     from openai import AsyncOpenAI
 
@@ -257,10 +266,22 @@ async def _openai_chat(
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Parliament Analytics chat")
+    parser.add_argument(
+        "--url",
+        metavar="URL",
+        default=None,
+        help=(
+            "HTTP URL of a running MCP server "
+            "(e.g. http://localhost:8000/mcp). "
+            "Omit to spawn the server locally via stdio."
+        ),
+    )
+    args = parser.parse_args()
     logging.basicConfig(level=logging.WARNING)
     load_settings_or_exit()
     try:
-        asyncio.run(chat_loop())
+        asyncio.run(chat_loop(server_url=args.url))
     except KeyboardInterrupt:
         pass
 
