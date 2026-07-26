@@ -100,6 +100,52 @@ class TestDIPClientPagination:
         assert persons[0].id == "p1"
 
     @pytest.mark.asyncio
+    async def test_repeated_cursor_terminates_without_duplicates(
+        self,
+    ) -> None:
+        """DIP signals end-of-list by echoing the request cursor unchanged.
+
+        Even if that final page still carries documents, they must not be
+        yielded a second time — and the loop must terminate.
+        """
+        # numFound overstates the parseable docs, so the yield count alone
+        # can never terminate the loop; only the cursor echo can.
+        page = {
+            "cursor": "LAST",
+            "numFound": 3,
+            "documents": [_person_doc("p1"), _person_doc("p2")],
+        }
+
+        async with DIPClient(_mock_settings()) as client:
+            with patch.object(
+                client, "_get_cached", new=AsyncMock(return_value=page)
+            ) as mock_get:
+                persons = [p async for p in client.get_persons(wahlperiode=20)]
+
+        assert [p.id for p in persons] == ["p1", "p2"]  # no duplicates
+        assert mock_get.await_count == 2  # first page + echoed-cursor page
+
+    @pytest.mark.asyncio
+    async def test_no_extra_request_when_all_hits_delivered(self) -> None:
+        """When numFound is reached, the redundant end-of-list request
+        (and its politeness delay) must be skipped."""
+        page = {
+            "cursor": "LAST",
+            "numFound": 1,
+            "documents": [_person_doc("p1")],
+        }
+
+        async with DIPClient(_mock_settings()) as client:
+            with patch.object(
+                client, "_get_cached", new=AsyncMock(return_value=page)
+            ) as mock_get:
+                persons = [p async for p in client.get_persons(wahlperiode=20)]
+
+        assert len(persons) == 1
+        assert mock_get.await_count == 1
+        assert client.delay_ms == 0
+
+    @pytest.mark.asyncio
     async def test_malformed_document_is_skipped(self) -> None:
         response = {
             "cursor": None,
@@ -202,3 +248,39 @@ class TestDIPClientCache:
 
         # both queued responses were consumed — no stale cache reuse
         assert len(httpx_mock.get_requests()) == 2
+
+    @pytest.mark.asyncio
+    async def test_cached_pages_skip_page_delay(
+        self, httpx_mock, tmp_path
+    ) -> None:
+        """The inter-page politeness delay paces live requests only;
+        a fully cached pagination must not sleep at all."""
+        settings = _mock_settings(
+            dip_cache_ttl=60.0, dip_cache_dir=str(tmp_path)
+        )
+        httpx_mock.add_response(
+            json={
+                "cursor": "c2",
+                "numFound": 2,
+                "documents": [_person_doc("p1")],
+            }
+        )
+        httpx_mock.add_response(
+            json={
+                "cursor": "c3",
+                "numFound": 2,
+                "documents": [_person_doc("p2")],
+            }
+        )
+
+        async with DIPClient(settings) as live_client:
+            first = [p async for p in live_client.get_persons(wahlperiode=20)]
+        async with DIPClient(settings) as cached_client:
+            second = [
+                p async for p in cached_client.get_persons(wahlperiode=20)
+            ]
+
+        assert [p.id for p in first] == [p.id for p in second] == ["p1", "p2"]
+        assert len(httpx_mock.get_requests()) == 2  # second run fully cached
+        assert live_client.delay_ms > 0  # live pages are paced
+        assert cached_client.delay_ms == 0  # cache hits skip the delay

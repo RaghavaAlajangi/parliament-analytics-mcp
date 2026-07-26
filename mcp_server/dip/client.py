@@ -36,6 +36,10 @@ class DIPClient:
         # cumulative HTTP time (excludes cache hits) and inter-page sleep time
         self.api_ms: float = 0.0
         self.delay_ms: float = 0.0
+        # whether the most recent _get_cached call was served from cache
+        self.last_from_cache: bool = False
+        # numFound reported by the API for the most recent get_persons call
+        self.last_num_found: int = 0
         self._cache: ResponseCache | None = (
             ResponseCache(Path(settings.dip_cache_dir), settings.dip_cache_ttl)
             if settings.dip_cache_ttl > 0
@@ -91,10 +95,12 @@ class DIPClient:
     async def _get_cached(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
+        self.last_from_cache = False
         if self._cache is not None:
             cached = self._cache.get(path, params)
             if cached is not None:
                 logger.debug("DIP cache hit: GET %s", path)
+                self.last_from_cache = True
                 return cached
         data = await self._get(path, params)
         if self._cache is not None:
@@ -124,6 +130,7 @@ class DIPClient:
         """Paginate all persons, optionally filtered by wahlperiode or
         search."""
         base_params: dict[str, Any] = {"format": "json"}
+        self.last_num_found = 0
         if wahlperiode is not None:
             base_params["f.wahlperiode"] = wahlperiode
 
@@ -151,11 +158,17 @@ class DIPClient:
         else:
             return  # all candidates returned zero results
 
+        self.last_num_found = first_resp.numFound
+
         while True:
             if cursor:
                 params["cursor"] = cursor
                 raw = await self._get_cached("/person", params)
                 resp = DIPListResponse.model_validate(raw)
+                # DIP signals end-of-list by echoing the request cursor
+                # unchanged; yielding such a page would duplicate records
+                if resp.cursor == cursor:
+                    break
 
             if not resp.documents:
                 break
@@ -179,12 +192,20 @@ class DIPClient:
                 )
                 break
 
+            # All reported hits delivered — skip the redundant end-of-list
+            # request (only skipped-malformed docs can leave us below it)
+            if total_yielded >= resp.numFound:
+                break
+
             cursor = resp.cursor
             if not cursor:
                 break
-            t1 = time.perf_counter()
-            await asyncio.sleep(_PAGE_DELAY)
-            self.delay_ms += (time.perf_counter() - t1) * 1000
+            # Pace consecutive live requests; a cache hit made no request,
+            # so no delay is needed before the next page
+            if not self.last_from_cache:
+                t1 = time.perf_counter()
+                await asyncio.sleep(_PAGE_DELAY)
+                self.delay_ms += (time.perf_counter() - t1) * 1000
 
     async def get_person(self, person_id: str) -> PersonDetail:
         """Fetch a single politician by ID."""
