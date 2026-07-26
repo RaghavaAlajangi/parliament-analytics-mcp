@@ -23,7 +23,10 @@ class PoliticianResult(BaseModel):
 class PoliticianListResult(BaseModel):
     query: str
     results: list[PoliticianResult]
-    total_found: int
+    total_found: int = Field(
+        description="Total matches reported by the DIP API; "
+        "results may be capped to fewer entries"
+    )
 
 
 class FraktionShare(BaseModel):

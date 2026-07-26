@@ -1,7 +1,6 @@
 """MCP tool: look up a politician by name."""
 
 import logging
-import sys
 from typing import Annotated
 
 from pydantic import Field
@@ -89,13 +88,9 @@ async def get_politician(
         client.api_ms,
         client.delay_ms,
     )
-    print(
-        f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",
-        file=sys.stderr,
-    )
 
     return PoliticianListResult(
         query=name,
         results=results,
-        total_found=len(results),
+        total_found=client.last_num_found,
     )
