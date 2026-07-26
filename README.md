@@ -7,13 +7,34 @@ autonomously from your natural language question.
 
 ## Setup
 
-**1. Install dependencies**
+**1. Create and activate a virtual environment**
 
+Using `venv`:
 ```bash
-pip install -e ".[dev]"
+python -m venv .venv
+# macOS/Linux
+source .venv/bin/activate
+# Windows
+.venv\Scripts\activate
 ```
 
-**2. Configure environment**
+Or using `uv` (faster):
+```bash
+uv venv
+source .venv/bin/activate  # macOS/Linux
+.venv\Scripts\activate     # Windows
+```
+
+**2. Install dependencies**
+
+```bash
+# pip
+pip install -e ".[dev]"
+# uv
+uv pip install -e ".[dev]"
+```
+
+**3. Configure environment**
 
 ```bash
 cp .env.example .env
@@ -22,7 +43,7 @@ cp .env.example .env
 # - GROQ_API_KEY (free at https://groq.com/) or OPENAI_API_KEY
 ```
 
-**3. Run tests**
+**4. Run tests**
 
 ```bash
 pytest tests/ -v
@@ -35,7 +56,13 @@ pytest tests/ -v
 ```bash
 parliament-chat
 # You: Wie ist die Fraktionsverteilung in der 21. Wahlperiode?
-# [calling tool: get_fraktion_distribution({"wahlperiode": 21})]
+#  [llm openai/gpt-4.1-mini tokens=441 latency=1762ms]
+# --------------------------------------------------
+#  [tool call: get_fraktion_distribution({'wahlperiode': 21})]
+#  [tool status: ok, latency=4830ms]
+# --------------------------------------------------
+#  [llm openai/gpt-4.1-mini tokens=766 latency=2216ms]
+
 # Assistant: Die CDU/CSU ist mit ...
 ```
 
