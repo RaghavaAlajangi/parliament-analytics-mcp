@@ -13,6 +13,7 @@ import asyncio
 import logging
 import sys
 
+from mcp_server.config import load_settings_or_exit
 from mcp_server.llm.router import RoutingError, route
 from mcp_server.tools.get_distribution import get_fraktion_distribution
 from mcp_server.tools.get_politician import get_politician
@@ -57,6 +58,7 @@ def main() -> None:
         print('Usage: parliament-cli "<your question>"', file=sys.stderr)
         sys.exit(1)
 
+    load_settings_or_exit()
     query = " ".join(sys.argv[1:])
 
     try:

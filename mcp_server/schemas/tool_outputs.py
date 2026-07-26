@@ -3,11 +3,20 @@
 from pydantic import BaseModel, Field
 
 
+class RoleEntry(BaseModel):
+    fraktion: str | None = None
+    ressort_titel: str | None = None
+    wahlperiode_nummer: list[int] = Field(default_factory=list)
+
+
 class PoliticianResult(BaseModel):
     id: str
     full_name: str
-    fraktion: str | None
-    wahlperiode: list[int]
+    titel: str | None = None
+    funktion: list[str] = Field(default_factory=list)
+    fraktion: str | None = None
+    wahlperiode: list[int] = Field(default_factory=list)
+    roles: list[RoleEntry] = Field(default_factory=list)
     biography_url: str | None = None
 
 
@@ -30,6 +39,19 @@ class FraktionDistribution(BaseModel):
         description="Sorted descending by count"
     )
     data_quality_notes: list[str] = Field(default_factory=list)
+
+
+class MemberEntry(BaseModel):
+    full_name: str
+    fraktion: str | None = None
+    wahlperiode: list[int] = Field(default_factory=list)
+
+
+class MemberListResult(BaseModel):
+    wahlperiode: int
+    fraktion_filter: str | None = None
+    results: list[MemberEntry]
+    total_found: int
 
 
 class NarrationResult(BaseModel):

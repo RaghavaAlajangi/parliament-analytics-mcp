@@ -38,7 +38,9 @@ pip install -e ".[dev]"
 ```bash
 cp .env.example .env
 # Edit .env and fill in your keys:
-# - DIP_API_KEY  (use BTK2024 for the free demo key)
+# - DIP_API_KEY  (.env.example ships the public key, valid until end of
+#                 May 2027 — it rotates yearly, see
+#                 https://dip.bundestag.de/über-dip/hilfe/api)
 # - GROQ_API_KEY (free at https://groq.com/)
 ```
 
@@ -80,7 +82,7 @@ Add to `claude_desktop_config.json`:
     "parliament-analytics": {
       "command": "parliament-mcp",
       "env": {
-        "DIP_API_KEY": "BTK2024",
+        "DIP_API_KEY": "see .env.example for the current public key",
         "GROQ_API_KEY": "your_key"
       }
     }
@@ -95,6 +97,23 @@ Add to `claude_desktop_config.json`:
 | `get_politician` | Look up a politician by name; returns faction and biography data |
 | `get_fraktion_distribution` | Calculates % share per Fraktion for a given Wahlperiode |
 | `narrate_distribution` | Fetches distribution and produces a natural-language analysis |
+
+## Rate limiting & bot protection
+
+DIP fronts its API with a bot-protection layer (Enodia). Throttled or
+suspicious clients receive a `303` redirect to a JavaScript challenge
+instead of data — this looks like an invalid API key but is usually
+throttling. The client handles this respectfully:
+
+- Retries `429` and challenge redirects with exponential backoff,
+  honouring `Retry-After` (`DIP_RETRY_*` settings)
+- Optional on-disk response cache (`DIP_CACHE_TTL`) so repeated queries
+  don't re-hit the API — parliament data changes slowly
+- Configurable pagination delay and concurrency (`DIP_PAGE_DELAY`,
+  `DIP_MAX_CONCURRENT`)
+
+The shared public key rotates yearly. If throttling persists, request a
+personal 10-year key from parlamentsdokumentation@bundestag.de.
 
 ## Project Structure
 

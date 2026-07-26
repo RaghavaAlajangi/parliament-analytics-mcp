@@ -1,8 +1,11 @@
 """MCP tool: narrate a Fraktion distribution in natural language."""
 
 import logging
-from typing import Literal
+from typing import Annotated, Literal
 
+from pydantic import Field
+
+from mcp_server.llm.narrator import narrate
 from mcp_server.schemas.tool_outputs import (
     FraktionDistribution,
     NarrationResult,
@@ -13,7 +16,10 @@ logger = logging.getLogger(__name__)
 
 
 async def narrate_distribution(
-    wahlperiode: int,
+    wahlperiode: Annotated[
+        int,
+        Field(ge=1, description="Wahlperiode number, e.g. 20"),
+    ],
     language: Literal["de", "en"] = "de",
     style: Literal["concise", "detailed"] = "concise",
 ) -> NarrationResult:
@@ -38,10 +44,6 @@ async def narrate_distribution(
     NarrationResult
         Generated text with validation status.
     """
-    from mcp_server.llm.narrator import (
-        narrate,  # local import to avoid circular
-    )
-
     distribution: FraktionDistribution = await get_fraktion_distribution(
         wahlperiode
     )

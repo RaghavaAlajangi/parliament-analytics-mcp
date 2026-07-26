@@ -1,27 +1,27 @@
-"""Async DIP Bundestag API client with pagination, retries, and rate
-limiting."""
+"""Async DIP Bundestag API client with pagination and caching."""
 
 import asyncio
 import logging
+import time
 from collections.abc import AsyncIterator
+from pathlib import Path
 from typing import Any
 
 import httpx
-from tenacity import (
-    retry,
-    retry_if_exception,
-    stop_after_attempt,
-    wait_exponential,
-)
 
 from mcp_server.config import Settings
-from mcp_server.dip.models import (
-    DIPListResponse,
-    Person,
-    PersonDetail,
-)
+from mcp_server.dip.cache import ResponseCache
+from mcp_server.dip.models import DIPListResponse, Person, PersonDetail
 
 logger = logging.getLogger(__name__)
+
+_REDIRECT_CODES = (301, 302, 303, 307, 308)
+_PAGE_DELAY = 0.5  # seconds between paginated requests
+_MAX_CONCURRENT = 1
+
+
+class DIPUnavailableError(Exception):
+    """DIP is temporarily refusing requests (rate limit or bot protection)."""
 
 
 class DIPClient:
@@ -30,122 +30,161 @@ class DIPClient:
     def __init__(self, settings: Settings) -> None:
         self._base_url = settings.dip_base_url.rstrip("/")
         self._api_key = settings.dip_api_key
-        self._page_size = settings.dip_page_size
-        self._page_delay = settings.dip_page_delay
-        self._semaphore = asyncio.Semaphore(settings.dip_max_concurrent)
+        self._max_records = settings.dip_max_records
+        self._semaphore = asyncio.Semaphore(_MAX_CONCURRENT)
         self._client: httpx.AsyncClient | None = None
+        # cumulative HTTP time (excludes cache hits) and inter-page sleep time
+        self.api_ms: float = 0.0
+        self.delay_ms: float = 0.0
+        self._cache: ResponseCache | None = (
+            ResponseCache(Path(settings.dip_cache_dir), settings.dip_cache_ttl)
+            if settings.dip_cache_ttl > 0
+            else None
+        )
 
     async def __aenter__(self) -> "DIPClient":
-        self._client = httpx.AsyncClient(timeout=30.0)
+        self._client = httpx.AsyncClient(
+            timeout=30.0,
+            headers={"Authorization": f"ApiKey {self._api_key}"},
+        )
         return self
 
     async def __aexit__(self, *_: Any) -> None:
         if self._client:
             await self._client.aclose()
 
-    @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=1, max=8),
-        retry=retry_if_exception(
-            lambda e: isinstance(e, httpx.HTTPStatusError)
-            and e.response.status_code >= 500
-        ),
-    )
     async def _get(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
         assert self._client is not None, (
             "DIPClient must be used as async context manager"
         )
-        all_params = {"apikey": self._api_key, **(params or {})}
         url = f"{self._base_url}{path}"
 
         async with self._semaphore:
-            logger.debug(
-                "DIP GET %s params=%s",
-                path,
-                {k: v for k, v in all_params.items() if k != "apikey"},
-            )
-            response = await self._client.get(url, params=all_params)
+            logger.debug("DIP GET %s params=%s", path, params)
+            t0 = time.perf_counter()
+            response = await self._client.get(url, params=params or {})
+            self.api_ms += (time.perf_counter() - t0) * 1000
 
-        if response.status_code in (301, 302, 303, 307, 308):
-            raise httpx.HTTPStatusError(
-                f"DIP API returned a redirect ({response.status_code}) — "
-                "the API key may be invalid, expired, or rate-limited. "
-                f"Location: {response.headers.get('location', 'unknown')}",
-                request=response.request,
-                response=response,
+        if (
+            response.status_code == 429
+            or response.status_code in _REDIRECT_CODES
+        ):
+            reason = (
+                "rate limited (HTTP 429)"
+                if response.status_code == 429
+                else f"bot-protection challenge (HTTP {response.status_code})"
             )
+            logger.warning("DIP API %s on GET %s", reason, path)
+            raise DIPUnavailableError(
+                f"DIP API {reason}. Wait a few minutes or verify your API key."
+            )
+
         if not response.is_success:
             logger.error(
-                "DIP API error: GET %s -> HTTP %d: %s",
-                path,
-                response.status_code,
-                response.text[:200],
+                "DIP API error: GET %s -> HTTP %d", path, response.status_code
             )
         response.raise_for_status()
         return response.json()
+
+    async def _get_cached(
+        self, path: str, params: dict[str, Any] | None = None
+    ) -> dict:
+        if self._cache is not None:
+            cached = self._cache.get(path, params)
+            if cached is not None:
+                logger.debug("DIP cache hit: GET %s", path)
+                return cached
+        data = await self._get(path, params)
+        if self._cache is not None:
+            self._cache.put(path, params, data)
+        return data
+
+    @staticmethod
+    def _search_candidates(name: str) -> list[str]:
+        """Return name variants to try in order.
+
+        The DIP f.person filter expects Lastname Firstname order.
+        When a two-token name yields no results we retry with tokens
+        swapped so that natural "Firstname Lastname" input also works.
+        Single tokens and already-reversed names are returned as-is.
+        """
+        name = name.strip()
+        tokens = name.split()
+        if len(tokens) == 2:
+            return [name, f"{tokens[1]} {tokens[0]}"]
+        return [name]
 
     async def get_persons(
         self,
         wahlperiode: int | None = None,
         search: str | None = None,
     ) -> AsyncIterator[Person]:
-        """Paginate all persons, optionally filtered by wahlperiode or search.
-
-        Parameters
-        ----------
-        wahlperiode : int or None, optional
-            Filter results to this Wahlperiode number.
-        search : str or None, optional
-            Free-text search term matched against person names.
-
-        Yields
-        ------
-        Person
-            Validated Person records from the DIP API.
-        """
-        params: dict[str, Any] = {"format": "json", "rows": self._page_size}
+        """Paginate all persons, optionally filtered by wahlperiode or search."""
+        base_params: dict[str, Any] = {"format": "json"}
         if wahlperiode is not None:
-            params["f.wahlperiode"] = wahlperiode
-        if search:
-            params["q"] = search
+            base_params["f.wahlperiode"] = wahlperiode
 
-        cursor: str | None = None
+        search_terms = self._search_candidates(search) if search else [None]
+
+        for term in search_terms:
+            params = dict(base_params)
+            if term:
+                params["f.person"] = term
+
+            # Peek at the first page to detect zero hits before committing
+            first_page = await self._get_cached("/person", params)
+            first_resp = DIPListResponse.model_validate(first_page)
+
+            if first_resp.numFound == 0 and len(search_terms) > 1:
+                logger.debug(
+                    "DIP zero hits for %r, trying reversed form", term
+                )
+                continue  # try next candidate
+
+            cursor: str | None = None
+            total_yielded = 0
+            resp = first_resp
+            break
+        else:
+            return  # all candidates returned zero results
 
         while True:
             if cursor:
                 params["cursor"] = cursor
-
-            raw = await self._get("/person", params)
-            resp = DIPListResponse.model_validate(raw)
+                raw = await self._get_cached("/person", params)
+                resp = DIPListResponse.model_validate(raw)
 
             for doc in resp.documents:
                 try:
                     yield Person.model_validate(doc)
+                    total_yielded += 1
                 except Exception:
                     logger.warning(
-                        f"Could not parse person document: {doc.get('id')}"
+                        "Could not parse person document: %s", doc.get("id")
                     )
 
-            cursor = resp.cursor
-            if cursor and self._page_delay > 0:
-                await asyncio.sleep(self._page_delay)
-            if not cursor:
+            logger.info(
+                "DIP pagination: %d/%d records", total_yielded, resp.numFound
+            )
+
+            if total_yielded >= self._max_records:
+                logger.warning(
+                    "DIP max_records cap (%d) reached", self._max_records
+                )
                 break
 
+            cursor = resp.cursor
+            if not cursor or total_yielded >= resp.numFound:
+                break
+            t1 = time.perf_counter()
+            await asyncio.sleep(_PAGE_DELAY)
+            self.delay_ms += (time.perf_counter() - t1) * 1000
+
     async def get_person(self, person_id: str) -> PersonDetail:
-        """Fetch a single politician by ID.
-
-        Parameters
-        ----------
-        person_id : str
-            DIP person identifier.
-
-        Returns
-        -------
-        PersonDetail
-            Full politician record including roles.
-        """
-        raw = await self._get(f"/person/{person_id}", {"format": "json"})
+        """Fetch a single politician by ID."""
+        raw = await self._get_cached(
+            f"/person/{person_id}", {"format": "json"}
+        )
         return PersonDetail.model_validate(raw)

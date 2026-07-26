@@ -221,3 +221,6 @@ __marimo__/
 *.env.local
 .env.*.local
 
+
+# DIP response cache
+.dip_cache/
