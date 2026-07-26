@@ -39,7 +39,7 @@ def compute_distribution(
             if wahlperiode is not None
             else person.fraktion
         )
-        if fraktion:
+        if fraktion and fraktion.lower() != "fraktionslos":
             counts[fraktion] += 1
         else:
             counts[FRAKTIONSLOS] += 1
