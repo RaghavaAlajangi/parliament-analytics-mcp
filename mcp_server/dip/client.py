@@ -60,9 +60,10 @@ class DIPClient:
     async def _get(
         self, path: str, params: dict[str, Any] | None = None
     ) -> dict:
-        assert self._client is not None, (
-            "DIPClient must be used as async context manager"
-        )
+        if self._client is None:
+            raise RuntimeError(
+                "DIPClient must be used as async context manager"
+            )
         url = f"{self._base_url}{path}"
 
         async with self._semaphore:
