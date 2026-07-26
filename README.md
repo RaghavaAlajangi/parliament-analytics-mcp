@@ -96,6 +96,27 @@ Add to `claude_desktop_config.json`:
 | `get_members` | List politicians in a Wahlperiode, optionally filtered by Fraktion |
 | `get_fraktion_distribution` | Calculates % share per Fraktion for a given Wahlperiode |
 
+## Deliverables
+
+- **3 MCP tools** exposed via a `fastmcp` server:
+  - `get_politician` — look up a politician by name, returns Fraktion and biography data
+  - `get_members` — browse members of a Wahlperiode, optionally filtered by Fraktion
+  - `get_fraktion_distribution` — compute percentage share per Fraktion for a given Wahlperiode
+- **Autonomous chat agent** (`parliament-chat`) — an LLM connects to the MCP server, picks tools from natural language input, and synthesises the answer
+- **Installable package** with a `parliament-chat` entry point; no manual server wiring needed
+- **Inline observability** — every tool call logs LLM token usage, latency, and DIP API/delay timing to the console (production systems would route this to Langfuse or OpenTelemetry)
+- **On-disk response cache** — avoids re-hitting the DIP API for repeated queries within a 24 h window
+
+## Design Decisions & Assumptions
+
+**Autonomous tool calling over deterministic routing.** The original intent was a deterministic pipeline where the LLM only extracts parameters and routing happens in code. MCP's design delegates tool selection entirely to the LLM, so the implemented architecture is fully autonomous — the LLM decides which tool to call and when. This is a conscious trade-off: simpler code, but tool choice is non-deterministic.
+
+**Intentional simplicity.** Complex retry logic (exponential back-off, circuit breakers), distributed tracing, and multi-agent coordination were scoped out. The DIP API is a single external dependency; a simple cache and a clear error on throttling is sufficient for this challenge.
+
+**LLM providers.** Both OpenAI and Groq are supported as drop-in alternatives via `LLM_PROVIDER` in `.env`. Groq is the default (free tier, fast inference). Switch to OpenAI by setting `LLM_PROVIDER=openai`.
+
+**DIP API assumptions.** The `f.person` filter expects `Lastname Firstname` order; the client tries both orderings automatically. The `f.wahlperiode` filter is applied server-side but not guaranteed to be exhaustive, so results are also filtered client-side. The shared public API key is valid until May 2027.
+
 ## Rate limiting
 
 DIP fronts its API with bot-protection (Enodia). Throttled clients receive a
