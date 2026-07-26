@@ -72,7 +72,11 @@ async def get_members(
     logger.info(
         "get_members wahlperiode=%d fraktion=%r found=%d "
         "api=%.0fms delay=%.0fms",
-        wahlperiode, fraktion, len(results), client.api_ms, client.delay_ms,
+        wahlperiode,
+        fraktion,
+        len(results),
+        client.api_ms,
+        client.delay_ms,
     )
     print(
         f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",

@@ -83,8 +83,11 @@ async def get_politician(
     logger.info(
         "get_politician query=%r wahlperiode=%s found=%d "
         "api=%.0fms delay=%.0fms",
-        name, wahlperiode, len(results),
-        client.api_ms, client.delay_ms,
+        name,
+        wahlperiode,
+        len(results),
+        client.api_ms,
+        client.delay_ms,
     )
     print(
         f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",
