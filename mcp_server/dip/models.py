@@ -19,9 +19,7 @@ class Person(BaseModel):
     nachname: str | None = None
     titel: str | None = None  # full display title from API
     namenszusatz: str | None = None
-    funktion: list[str] = Field(
-        default_factory=list
-    )  # e.g. ["MdB", "Bundespräs."]
+    funktion: list[str] = Field(default_factory=list)  # e.g. ["MdB", "Bundespräs."]
     # API returns fraktion as list[str]; we store the first entry
     fraktion: str | None = None
     # API returns wahlperiode as list[int]

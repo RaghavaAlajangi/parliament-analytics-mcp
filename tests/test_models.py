@@ -33,9 +33,7 @@ class TestFullName:
 
 class TestFieldNormalisation:
     def test_funktion_as_string_is_wrapped(self) -> None:
-        p = Person.model_validate(
-            {"id": "1", "funktion": "LMin Soz u. Frauen"}
-        )
+        p = Person.model_validate({"id": "1", "funktion": "LMin Soz u. Frauen"})
         assert p.funktion == ["LMin Soz u. Frauen"]
 
     def test_funktion_as_list_is_kept(self) -> None:
