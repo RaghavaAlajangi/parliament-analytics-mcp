@@ -1,0 +1,28 @@
+services:
+  mcp-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: parliament-analytics-mcp:latest
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    environment:
+      MCP_HOST: "0.0.0.0"
+      MCP_PORT: "8000"
+      DIP_CACHE_DIR: "/app/.dip_cache"
+    volumes:
+      - dip-cache:/app/.dip_cache
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+
+volumes:
+  dip-cache:
+    driver: local
