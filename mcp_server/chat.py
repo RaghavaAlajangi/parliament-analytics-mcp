@@ -46,8 +46,7 @@ async def chat_loop() -> None:
             tools_response = await session.list_tools()
             mcp_tools = tools_response.tools
             logger.info(
-                f"Connected to MCP server, "
-                f"tools: {[t.name for t in mcp_tools]}",
+                f"Connected to MCP server, " f"tools: {[t.name for t in mcp_tools]}",
             )
 
             # Convert MCP tool schemas to the format the LLM provider expects
@@ -78,9 +77,7 @@ async def chat_loop() -> None:
                 "when concrete data is available."
             )
 
-            messages: list[dict] = [
-                {"role": "system", "content": system_prompt}
-            ]
+            messages: list[dict] = [{"role": "system", "content": system_prompt}]
 
             while True:
                 try:
@@ -114,9 +111,7 @@ async def chat_loop() -> None:
                     if not tool_calls:
                         # LLM produced a final answer
                         print(f"\nAssistant: {response_text}\n")
-                        messages.append(
-                            {"role": "assistant", "content": response_text}
-                        )
+                        messages.append({"role": "assistant", "content": response_text})
                         break
 
                     # Execute each tool call via MCP and feed results back
@@ -159,15 +154,11 @@ async def chat_loop() -> None:
                             )
                             continue
                         total_ms = (time.perf_counter() - t0) * 1000
-                        result_text = (
-                            result.content[0].text if result.content else "{}"
-                        )
+                        result_text = result.content[0].text if result.content else "{}"
                         if result.isError:
                             print(f"  [error: {result_text}]")
                         else:
-                            print(
-                                f"  [tool status: ok, latency={total_ms:.0f}ms]"
-                            )
+                            print(f"  [tool status: ok, latency={total_ms:.0f}ms]")
                         print("-" * 50)
 
                         messages.append(

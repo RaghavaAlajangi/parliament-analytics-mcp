@@ -25,9 +25,7 @@ class TestMCPServer:
     ) -> None:
         async with Client(mcp) as client:
             with pytest.raises(ToolError):
-                await client.call_tool(
-                    "get_fraktion_distribution", {"wahlperiode": 0}
-                )
+                await client.call_tool("get_fraktion_distribution", {"wahlperiode": 0})
 
     @pytest.mark.asyncio
     async def test_empty_name_rejected(self) -> None:

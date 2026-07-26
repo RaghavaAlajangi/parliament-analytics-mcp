@@ -93,12 +93,8 @@ class TestDIPClientPagination:
 
 class TestDIPClientResilience:
     @pytest.mark.asyncio
-    async def test_api_key_sent_as_authorization_header(
-        self, httpx_mock
-    ) -> None:
-        httpx_mock.add_response(
-            json={"cursor": None, "numFound": 0, "documents": []}
-        )
+    async def test_api_key_sent_as_authorization_header(self, httpx_mock) -> None:
+        httpx_mock.add_response(json={"cursor": None, "numFound": 0, "documents": []})
         async with DIPClient(_mock_settings()) as client:
             [p async for p in client.get_persons(wahlperiode=20)]
 
@@ -128,12 +124,8 @@ class TestDIPClientResilience:
 
 class TestDIPClientCache:
     @pytest.mark.asyncio
-    async def test_second_call_served_from_cache(
-        self, httpx_mock, tmp_path
-    ) -> None:
-        settings = _mock_settings(
-            dip_cache_ttl=60.0, dip_cache_dir=str(tmp_path)
-        )
+    async def test_second_call_served_from_cache(self, httpx_mock, tmp_path) -> None:
+        settings = _mock_settings(dip_cache_ttl=60.0, dip_cache_dir=str(tmp_path))
         # Only ONE HTTP response is queued; the second identical query
         # must be answered from the cache or the mock would fail.
         httpx_mock.add_response(
@@ -153,9 +145,7 @@ class TestDIPClientCache:
 
     @pytest.mark.asyncio
     async def test_expired_entry_refetches(self, httpx_mock, tmp_path) -> None:
-        settings = _mock_settings(
-            dip_cache_ttl=0.000001, dip_cache_dir=str(tmp_path)
-        )
+        settings = _mock_settings(dip_cache_ttl=0.000001, dip_cache_dir=str(tmp_path))
         for _ in range(2):
             httpx_mock.add_response(
                 json={

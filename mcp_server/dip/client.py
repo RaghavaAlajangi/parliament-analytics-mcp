@@ -53,12 +53,10 @@ class DIPClient:
         if self._client:
             await self._client.aclose()
 
-    async def _get(
-        self, path: str, params: dict[str, Any] | None = None
-    ) -> dict:
-        assert self._client is not None, (
-            "DIPClient must be used as async context manager"
-        )
+    async def _get(self, path: str, params: dict[str, Any] | None = None) -> dict:
+        assert (
+            self._client is not None
+        ), "DIPClient must be used as async context manager"
         url = f"{self._base_url}{path}"
 
         async with self._semaphore:
@@ -67,10 +65,7 @@ class DIPClient:
             response = await self._client.get(url, params=params or {})
             self.api_ms += (time.perf_counter() - t0) * 1000
 
-        if (
-            response.status_code == 429
-            or response.status_code in _REDIRECT_CODES
-        ):
+        if response.status_code == 429 or response.status_code in _REDIRECT_CODES:
             reason = (
                 "rate limited (HTTP 429)"
                 if response.status_code == 429
@@ -82,9 +77,7 @@ class DIPClient:
             )
 
         if not response.is_success:
-            logger.error(
-                "DIP API error: GET %s -> HTTP %d", path, response.status_code
-            )
+            logger.error("DIP API error: GET %s -> HTTP %d", path, response.status_code)
         response.raise_for_status()
         return response.json()
 
@@ -139,9 +132,7 @@ class DIPClient:
             first_resp = DIPListResponse.model_validate(first_page)
 
             if first_resp.numFound == 0 and len(search_terms) > 1:
-                logger.debug(
-                    "DIP zero hits for %r, trying reversed form", term
-                )
+                logger.debug("DIP zero hits for %r, trying reversed form", term)
                 continue  # try next candidate
 
             cursor: str | None = None
@@ -162,18 +153,12 @@ class DIPClient:
                     yield Person.model_validate(doc)
                     total_yielded += 1
                 except Exception:
-                    logger.warning(
-                        "Could not parse person document: %s", doc.get("id")
-                    )
+                    logger.warning("Could not parse person document: %s", doc.get("id"))
 
-            logger.info(
-                "DIP pagination: %d/%d records", total_yielded, resp.numFound
-            )
+            logger.info("DIP pagination: %d/%d records", total_yielded, resp.numFound)
 
             if total_yielded >= self._max_records:
-                logger.warning(
-                    "DIP max_records cap (%d) reached", self._max_records
-                )
+                logger.warning("DIP max_records cap (%d) reached", self._max_records)
                 break
 
             cursor = resp.cursor
@@ -185,7 +170,5 @@ class DIPClient:
 
     async def get_person(self, person_id: str) -> PersonDetail:
         """Fetch a single politician by ID."""
-        raw = await self._get_cached(
-            f"/person/{person_id}", {"format": "json"}
-        )
+        raw = await self._get_cached(f"/person/{person_id}", {"format": "json"})
         return PersonDetail.model_validate(raw)

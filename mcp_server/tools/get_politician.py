@@ -55,9 +55,7 @@ async def get_politician(
     results: list[PoliticianResult] = []
 
     async with DIPClient(settings) as client:
-        async for person in client.get_persons(
-            wahlperiode=wahlperiode, search=name
-        ):
+        async for person in client.get_persons(wahlperiode=wahlperiode, search=name):
             results.append(
                 PoliticianResult(
                     id=person.id,
@@ -81,8 +79,7 @@ async def get_politician(
                 break
 
     logger.info(
-        "get_politician query=%r wahlperiode=%s found=%d "
-        "api=%.0fms delay=%.0fms",
+        "get_politician query=%r wahlperiode=%s found=%d " "api=%.0fms delay=%.0fms",
         name,
         wahlperiode,
         len(results),
