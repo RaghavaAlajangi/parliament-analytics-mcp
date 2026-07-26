@@ -4,7 +4,6 @@
 [![codecov](https://codecov.io/gh/RaghavaAlajangi/parliament-analytics-mcp/branch/main/graph/badge.svg)](https://codecov.io/gh/RaghavaAlajangi/parliament-analytics-mcp)
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue?logo=python&logoColor=white)](https://www.python.org/)
 [![MCP](https://img.shields.io/badge/MCP-FastMCP-blueviolet?logo=anthropic&logoColor=white)](https://github.com/jlowin/fastmcp)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 Analyzes faction (Fraktion) distribution in the German Bundestag using the public
 [DIP API](https://dip.bundestag.de/ueber-dip/hilfe/api). Built on the
