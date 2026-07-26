@@ -1,4 +1,4 @@
-"""Mode 2 — Autonomous MCP Agent.
+"""Mode — Autonomous MCP Agent.
 
 Connects to the MCP server via stdio transport and lets an MCP-compatible
 LLM pick tools autonomously. The LLM reads tool descriptions, selects
@@ -132,8 +132,8 @@ async def chat_loop() -> None:
                         tool_name = tc["function"]["name"]
                         tool_args = json.loads(tc["function"]["arguments"])
 
-                        print(f"  ----------- {tool_name} -----------")
-                        print(f"  [calling: {tool_args}]")
+                        print("-" * 50)
+                        print(f"  [tool call: {tool_name}({tool_args})]")
 
                         t0 = time.perf_counter()
                         try:
@@ -143,9 +143,7 @@ async def chat_loop() -> None:
                             )
                         except TimeoutError:
                             total_ms = (time.perf_counter() - t0) * 1000
-                            print(
-                                f"  [timeout after {total_ms:.0f}ms]"
-                            )
+                            print(f"  [timeout after {total_ms:.0f}ms]")
                             print("  ------------------------------------")
                             messages.append(
                                 {
@@ -168,9 +166,9 @@ async def chat_loop() -> None:
                             print(f"  [error: {result_text}]")
                         else:
                             print(
-                                f"  [ok: total={total_ms:.0f}ms]"
+                                f"  [tool status: ok, latency={total_ms:.0f}ms]"
                             )
-                        print("  ------------------------------------")
+                        print("-" * 50)
 
                         messages.append(
                             {
@@ -202,9 +200,8 @@ async def _groq_chat(
     u = response.usage
     print(
         f"  [llm groq/{settings.llm_model} "
-        f"{llm_ms:.0f}ms "
-        f"in={u.prompt_tokens} out={u.completion_tokens} "
-        f"total={u.total_tokens}]"
+        f"tokens={u.total_tokens} "
+        f"latency={llm_ms:.0f}ms]"
     )
     msg = response.choices[0].message
     tool_calls = [
@@ -242,9 +239,8 @@ async def _openai_chat(
     u = response.usage
     print(
         f"  [llm openai/{settings.llm_model} "
-        f"{llm_ms:.0f}ms "
-        f"in={u.prompt_tokens} out={u.completion_tokens} "
-        f"total={u.total_tokens}]"
+        f"tokens={u.total_tokens} "
+        f"latency={llm_ms:.0f}ms]"
     )
     msg = response.choices[0].message
     tool_calls = [
