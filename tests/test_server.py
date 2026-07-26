@@ -17,7 +17,6 @@ class TestMCPServer:
             "get_politician",
             "get_members",
             "get_fraktion_distribution",
-            "narrate_distribution",
         }
 
     @pytest.mark.asyncio

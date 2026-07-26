@@ -23,9 +23,6 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.2
     llm_max_tokens: int = 2048
 
-    # Routing
-    max_router_retries: int = 3
-
     # Observability
     log_level: str = "INFO"
 
