@@ -35,7 +35,9 @@ class FraktionShare(BaseModel):
 class FraktionDistribution(BaseModel):
     wahlperiode: int
     total_politicians: int
-    shares: list[FraktionShare] = Field(description="Sorted descending by count")
+    shares: list[FraktionShare] = Field(
+        description="Sorted descending by count"
+    )
     data_quality_notes: list[str] = Field(default_factory=list)
 
 

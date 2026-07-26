@@ -20,7 +20,8 @@ class TestComputeDistribution:
         assert result.total_politicians == 0
         assert result.shares == []
         assert any(
-            "No politician records found" in n for n in result.data_quality_notes
+            "No politician records found" in n
+            for n in result.data_quality_notes
         )
 
     def test_single_fraktion(self) -> None:
@@ -32,7 +33,11 @@ class TestComputeDistribution:
         assert result.shares[0].percentage == 100.0
 
     def test_multiple_fraktionen_sorted_descending(self) -> None:
-        persons = [_person("CDU")] * 4 + [_person("SPD")] * 2 + [_person("Grüne")] * 1
+        persons = (
+            [_person("CDU")] * 4
+            + [_person("SPD")] * 2
+            + [_person("Grüne")] * 1
+        )
         result = compute_distribution(persons, wahlperiode=20)
         assert result.shares[0].fraktion == "CDU"
         assert result.shares[0].count == 4

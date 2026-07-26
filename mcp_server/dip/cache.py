@@ -39,7 +39,9 @@ class ResponseCache:
         except (OSError, json.JSONDecodeError):
             return None
 
-    def put(self, path: str, params: dict[str, Any] | None, response: dict) -> None:
+    def put(
+        self, path: str, params: dict[str, Any] | None, response: dict
+    ) -> None:
         """Store a response; cache failures are logged, never raised."""
         file = self._path_for(path, params)
         try:

@@ -47,7 +47,8 @@ def load_settings_or_exit() -> Settings:
         return Settings()
     except ValidationError as exc:
         missing = ", ".join(
-            ".".join(str(part) for part in err["loc"]).upper() for err in exc.errors()
+            ".".join(str(part) for part in err["loc"]).upper()
+            for err in exc.errors()
         )
         raise SystemExit(
             f"Configuration error ({missing}): copy .env.example to .env "
