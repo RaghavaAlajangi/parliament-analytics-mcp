@@ -33,8 +33,14 @@ class Settings(BaseSettings):
     )
 
 
+_settings: Settings | None = None
+
+
 def get_settings() -> Settings:
-    return Settings()
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
 
 
 def load_settings_or_exit() -> Settings:
