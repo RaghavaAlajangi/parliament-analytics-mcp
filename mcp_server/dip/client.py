@@ -207,4 +207,3 @@ class DIPClient:
                 t1 = time.perf_counter()
                 await asyncio.sleep(_PAGE_DELAY)
                 self.delay_ms += (time.perf_counter() - t1) * 1000
-

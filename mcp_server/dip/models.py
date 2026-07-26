@@ -72,7 +72,6 @@ class Person(BaseModel):
         return name or (self.titel or "")
 
 
-
 class DIPListResponse(BaseModel):
     """Generic paginated list response wrapper from the DIP API."""
 
