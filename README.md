@@ -20,6 +20,7 @@ autonomously from your natural language question.
    - [Option A — Docker (client delivery)](#option-a--docker-client-delivery)
    - [Option B — Local CLI](#option-b--local-cli)
    - [Option C — Claude Desktop](#option-c--claude-desktop)
+   - [Option D — Claude Code (CLI + VSCode extension)](#option-d--claude-code-cli--vscode-extension)
 6. [Tools Reference](#tools-reference)
 7. [Design Decisions & Trade-offs](#design-decisions--trade-offs)
 8. [Known Limitations](#known-limitations)
@@ -198,8 +199,7 @@ To use the MCP tools directly inside Claude Desktop, add the server to your conf
     "parliament-analytics": {
       "command": "parliament-mcp",
       "env": {
-        "DIP_API_KEY": "see .env.example for the current public key",
-        "GROQ_API_KEY": "your_groq_api_key"
+        "DIP_API_KEY": "see .env.example for the current public key"
       }
     }
   }
@@ -207,6 +207,39 @@ To use the MCP tools directly inside Claude Desktop, add the server to your conf
 ```
 
 Claude Desktop starts the MCP server automatically on launch.
+
+### Option D — Claude Code (CLI + VSCode extension)
+
+Use the MCP tools directly inside Claude Code — both the CLI and the VSCode extension.
+
+**Step 1 — Start the server (Docker recommended):**
+```bash
+docker compose up --build -d
+```
+
+**Step 2 — Register the server with Claude Code at project scope:**
+```bash
+claude mcp add parliament-analytics --transport http http://localhost:8000/mcp --scope project
+```
+
+The `--scope project` flag writes the config to `.claude/settings.json` in the repo root,
+which the VSCode extension reads automatically.
+
+**Step 3 — Verify the connection:**
+```bash
+claude mcp list
+# parliament-analytics: http://localhost:8000/mcp (HTTP) - ✔ Connected
+```
+
+**Step 4 — Reload VSCode** (`Ctrl+Shift+P` → "Developer: Reload Window").
+
+The tools will now appear in the Claude Code panel and be available to Claude in any
+conversation opened within this project.
+
+<img src="docs/images/mcp-connected.png" width="300" alt="parliament-analytics connected in Claude Code" />
+
+> **Note:** The server uses `streamable-http` transport. Use `--transport http` and the
+> `/mcp` path — not `/sse`. SSE transport is a different protocol and will fail to connect.
 
 ## Tools Reference
 
