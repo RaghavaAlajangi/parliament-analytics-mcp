@@ -253,6 +253,7 @@ Returns: Fraktion → percentage mapping, total member count, and `data_quality_
 | **Dual transport (stdio + HTTP)** | stdio works for Claude Desktop and local dev; HTTP is required for Docker. A `--url` flag switches between them at runtime with no server-code changes. | Two entry points (`parliament-mcp` and `parliament-mcp-http`) to maintain. |
 | **Groq as default LLM** | Free tier, fast inference, native tool-calling support. | Stricter rate limits than OpenAI; model availability may change. |
 | **On-disk response cache** | Parliament data changes slowly; caching avoids repeated DIP API hits and Enodia throttling. | Can serve stale data after a parliamentary reshuffle. Set `DIP_CACHE_TTL=0` to disable. |
+| **File cache over Redis** | Zero infrastructure dependency — clients only need Docker, not a Redis sidecar. Cache survives container restarts via a named Docker volume. | Cache is not shared across multiple server instances; horizontal scaling would require migrating to Redis (swap `ResponseCache` in `dip/cache.py` for an `aioredis` implementation and add a Redis service to `docker-compose.yml`). |
 | **Client-side Wahlperiode filtering** | The DIP `f.wahlperiode` filter is not guaranteed exhaustive. In-process filtering ensures correctness. | Fetches more records than strictly needed, increasing first-request latency on a cold cache. |
 | **Pydantic v2 for all schemas** | Strict typing on all inputs and outputs catches bad LLM-generated arguments before they reach the API. | Schema mismatches surface as validation errors the LLM must retry. |
 
