@@ -13,7 +13,6 @@ dependencies = [
     "pydantic>=2.7.0",
     "pydantic-settings>=2.3.0",
     "python-dotenv>=1.0.0",
-    "python-json-logger>=2.0.7",
     "groq>=0.9.0",
     "openai>=2.48.0",
 ]
