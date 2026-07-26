@@ -5,8 +5,10 @@ from unittest.mock import patch
 import pytest
 
 from mcp_server.config import Settings
-from mcp_server.dip.models import Person
+from mcp_server.dip.models import Person, PersonRole
 from mcp_server.tools.get_distribution import get_fraktion_distribution
+from mcp_server.tools.get_members import get_members
+from mcp_server.tools.get_politician import get_politician
 
 
 def _mock_settings() -> Settings:
@@ -16,10 +18,15 @@ def _mock_settings() -> Settings:
 class _FakeDIPClient:
     """Stands in for DIPClient; yields a canned list of persons."""
 
-    def __init__(self, persons: list[Person]) -> None:
+    def __init__(
+        self, persons: list[Person], num_found: int | None = None
+    ) -> None:
         self._persons = persons
         self.api_ms: float = 0.0
         self.delay_ms: float = 0.0
+        self.last_num_found: int = (
+            num_found if num_found is not None else len(persons)
+        )
 
     async def __aenter__(self) -> "_FakeDIPClient":
         return self
@@ -84,3 +91,65 @@ class TestGetFraktionDistribution:
 
         assert result.total_politicians == 2
         assert result.data_quality_notes == []
+
+
+class TestGetMembers:
+    @pytest.mark.asyncio
+    async def test_fraktion_resolved_for_requested_wahlperiode(self) -> None:
+        """A politician who switched Fraktion must be classified by the
+        Fraktion held in the REQUESTED Wahlperiode, not the current one."""
+        switcher = Person(
+            id="1",
+            vorname="Wechsel",
+            nachname="Kandidat",
+            fraktion="SPD",  # current (top-level) Fraktion
+            wahlperiode_nummer=[20, 21],
+            person_roles=[
+                PersonRole(fraktion="CDU/CSU", wahlperiode_nummer=[20]),
+                PersonRole(fraktion="SPD", wahlperiode_nummer=[21]),
+            ],
+        )
+        with (
+            patch(
+                "mcp_server.tools.get_members.DIPClient",
+                return_value=_FakeDIPClient([switcher]),
+            ),
+            patch(
+                "mcp_server.tools.get_members.get_settings",
+                return_value=_mock_settings(),
+            ),
+        ):
+            # In WP 20 the person was CDU/CSU — the SPD filter must miss
+            spd_in_20 = await get_members(wahlperiode=20, fraktion="SPD")
+            # ...and the CDU filter must hit, reporting the WP-20 Fraktion
+            cdu_in_20 = await get_members(wahlperiode=20, fraktion="CDU")
+
+        assert spd_in_20.results == []
+        assert len(cdu_in_20.results) == 1
+        assert cdu_in_20.results[0].fraktion == "CDU/CSU"
+
+
+class TestGetPolitician:
+    @pytest.mark.asyncio
+    async def test_total_found_reports_api_hits_not_capped_results(
+        self,
+    ) -> None:
+        """total_found must reflect the API's numFound even when the
+        returned results list is capped at MAX_POLITICIAN_RESULTS."""
+        persons = [
+            _person(str(i), "SPD", [21]) for i in range(7)
+        ]  # more than the cap of 5
+        with (
+            patch(
+                "mcp_server.tools.get_politician.DIPClient",
+                return_value=_FakeDIPClient(persons, num_found=7),
+            ),
+            patch(
+                "mcp_server.tools.get_politician.get_settings",
+                return_value=_mock_settings(),
+            ),
+        ):
+            result = await get_politician(name="Test")
+
+        assert len(result.results) == 5
+        assert result.total_found == 7
