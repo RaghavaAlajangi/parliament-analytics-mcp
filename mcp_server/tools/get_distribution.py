@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 async def get_fraktion_distribution(
     wahlperiode: Annotated[
         int,
-        Field(ge=1, description="Wahlperiode number, e.g. 20"),
+        Field(ge=1, description="Wahlperiode number, e.g. 21"),
     ],
 ) -> FraktionDistribution:
     """Calculate the percentage share of each Fraktion in a given Wahlperiode.
@@ -28,7 +28,7 @@ async def get_fraktion_distribution(
     Parameters
     ----------
     wahlperiode : int
-        Wahlperiode number, e.g. 20 for the 20th Bundestag.
+        Wahlperiode number, e.g. 21 for the current (21st) Bundestag.
 
     Returns
     -------

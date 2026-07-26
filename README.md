@@ -34,8 +34,8 @@ pytest tests/ -v
 
 ```bash
 parliament-chat
-# You: Wie ist die Fraktionsverteilung in der 20. Wahlperiode?
-# [calling tool: get_fraktion_distribution({"wahlperiode": 20})]
+# You: Wie ist die Fraktionsverteilung in der 21. Wahlperiode?
+# [calling tool: get_fraktion_distribution({"wahlperiode": 21})]
 # Assistant: Die CDU/CSU ist mit ...
 ```
 

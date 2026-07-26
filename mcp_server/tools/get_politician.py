@@ -30,7 +30,7 @@ async def get_politician(
     ],
     wahlperiode: Annotated[
         int | None,
-        Field(ge=1, description="Optional Wahlperiode filter, e.g. 20"),
+        Field(ge=1, description="Optional Wahlperiode filter, e.g. 21"),
     ] = None,
 ) -> PoliticianListResult:
     """Look up biographical and faction data for a named politician.
@@ -44,7 +44,7 @@ async def get_politician(
         Full or partial name, e.g. 'Friedrich Merz' or
         'Steinmeier Frank-Walter'.
     wahlperiode : int or None, optional
-        Optional Wahlperiode filter, e.g. 20.
+        Optional Wahlperiode filter, e.g. 21 for the current Bundestag.
 
     Returns
     -------
