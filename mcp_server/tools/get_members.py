@@ -1,7 +1,6 @@
 """MCP tool: list politicians in a Wahlperiode, optionally by Fraktion."""
 
 import logging
-import sys
 from typing import Annotated
 
 from pydantic import Field
@@ -54,15 +53,19 @@ async def get_members(
 
     async with DIPClient(settings) as client:
         async for person in client.get_persons(wahlperiode=wahlperiode):
+            # Resolve the Fraktion the person belonged to in THIS
+            # Wahlperiode (same rule as get_fraktion_distribution) —
+            # the top-level field only reflects the current Fraktion
+            person_fraktion = person.fraktion_for(wahlperiode)
             if fraktion_lower and (
-                person.fraktion is None
-                or fraktion_lower not in person.fraktion.lower()
+                person_fraktion is None
+                or fraktion_lower not in person_fraktion.lower()
             ):
                 continue
             results.append(
                 MemberEntry(
                     full_name=person.full_name,
-                    fraktion=person.fraktion,
+                    fraktion=person_fraktion,
                     wahlperiode=person.wahlperiode_nummer,
                 )
             )
@@ -77,10 +80,6 @@ async def get_members(
         len(results),
         client.api_ms,
         client.delay_ms,
-    )
-    print(
-        f"  [dip: api={client.api_ms:.0f}ms delay={client.delay_ms:.0f}ms]",
-        file=sys.stderr,
     )
 
     return MemberListResult(
