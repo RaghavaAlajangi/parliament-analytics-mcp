@@ -11,7 +11,7 @@ import httpx
 
 from mcp_server.config import Settings
 from mcp_server.dip.cache import ResponseCache
-from mcp_server.dip.models import DIPListResponse, Person, PersonDetail
+from mcp_server.dip.models import DIPListResponse, Person
 
 logger = logging.getLogger(__name__)
 
@@ -208,9 +208,3 @@ class DIPClient:
                 await asyncio.sleep(_PAGE_DELAY)
                 self.delay_ms += (time.perf_counter() - t1) * 1000
 
-    async def get_person(self, person_id: str) -> PersonDetail:
-        """Fetch a single politician by ID."""
-        raw = await self._get_cached(
-            f"/person/{person_id}", {"format": "json"}
-        )
-        return PersonDetail.model_validate(raw)

@@ -72,9 +72,6 @@ class Person(BaseModel):
         return name or (self.titel or "")
 
 
-class PersonDetail(Person):
-    """Extended politician model from GET /person/{id}."""
-
 
 class DIPListResponse(BaseModel):
     """Generic paginated list response wrapper from the DIP API."""
