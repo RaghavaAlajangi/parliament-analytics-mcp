@@ -22,7 +22,7 @@ from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
 from mcp.client.streamable_http import streamable_http_client
 
-from mcp_server.config import get_settings, load_settings_or_exit
+from mcp_server.config import Settings, get_settings, load_settings_or_exit
 
 logger = logging.getLogger(__name__)
 
@@ -190,7 +190,7 @@ async def chat_loop(server_url: str | None = None) -> None:
 async def _groq_chat(
     messages: list[dict],
     tools: list[dict],
-    settings,
+    settings: Settings,
 ) -> tuple[str, list[dict]]:
     from groq import AsyncGroq  # type: ignore[import-untyped]
 
@@ -229,7 +229,7 @@ async def _groq_chat(
 async def _openai_chat(
     messages: list[dict],
     tools: list[dict],
-    settings,
+    settings: Settings,
 ) -> tuple[str, list[dict]]:
     from openai import AsyncOpenAI
 
