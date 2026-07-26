@@ -109,13 +109,12 @@ Add to `claude_desktop_config.json`:
 
 ## Design Decisions & Assumptions
 
-**Autonomous tool calling over deterministic routing.** The original intent was a deterministic pipeline where the LLM only extracts parameters and routing happens in code. MCP's design delegates tool selection entirely to the LLM, so the implemented architecture is fully autonomous — the LLM decides which tool to call and when. This is a conscious trade-off: simpler code, but tool choice is non-deterministic.
-
-**Intentional simplicity.** Complex retry logic (exponential back-off, circuit breakers), distributed tracing, and multi-agent coordination were scoped out. The DIP API is a single external dependency; a simple cache and a clear error on throttling is sufficient for this challenge.
-
-**LLM providers.** Both OpenAI and Groq are supported as drop-in alternatives via `LLM_PROVIDER` in `.env`. Groq is the default (free tier, fast inference). Switch to OpenAI by setting `LLM_PROVIDER=openai`.
-
-**DIP API assumptions.** The `f.person` filter expects `Lastname Firstname` order; the client tries both orderings automatically. The `f.wahlperiode` filter is applied server-side but not guaranteed to be exhaustive, so results are also filtered client-side. The shared public API key is valid until May 2027.
+- **Autonomous tool calling over deterministic routing** — MCP delegates tool selection entirely to the LLM; the LLM decides which tool to call and when. A deterministic router was considered but MCP's design makes autonomous calling the natural fit.
+- **Intentional simplicity** — complex retry logic, circuit breakers, distributed tracing, and multi-agent coordination were scoped out; a disk cache and a clear error on throttling are sufficient here.
+- **Dual LLM provider support** — OpenAI and Groq are interchangeable via `LLM_PROVIDER` in `.env`; Groq is the default (free tier, fast inference).
+- **DIP API name order** — the `f.person` filter expects `Lastname Firstname`; the client automatically retries with tokens swapped so natural `Firstname Lastname` input works too.
+- **Client-side Wahlperiode filtering** — the `f.wahlperiode` API filter is not guaranteed exhaustive, so results are also filtered in-process to avoid counting records from other periods.
+- **Public API key** — the shared DIP key ships in `.env.example` and is valid until May 2027.
 
 ## Rate limiting
 
